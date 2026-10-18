@@ -5,3 +5,8 @@ export * from "./horse";
 export * from "./race";
 export * from "./track";
 export * from "./protocol";
+export * from "./names";
+export * from "./programs";
+export * from "./cpu";
+export * from "./resolve";
+export * from "./market";

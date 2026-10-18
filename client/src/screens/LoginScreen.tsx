@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { api, setToken } from "../api";
 import { Notice } from "../components";
+import { TitleShell } from "./TitleScreen";
 
-export function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
+export function LoginScreen({ onLoggedIn, onBack }: { onLoggedIn: () => void; onBack: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,17 +26,8 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   };
 
   return (
-    <div className="title-screen">
-      <div className="title-art" aria-hidden>
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((g) => (
-          <span key={g} className={`title-lane lane-${g}`} />
-        ))}
-      </div>
-      <div className="title-panel">
-        <h1 className="title-logo">
-          <span>オンライン</span>競走馬オーナーズ
-        </h1>
-        <p className="title-lead">馬を育て、出走させ、ほかのオーナーと同じレースで競う。</p>
+    <TitleShell>
+        <p className="title-lead">ほかのオーナーと同じレースで競います。</p>
         <form className="form" onSubmit={submit}>
           <label>
             ユーザー名
@@ -66,7 +58,10 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
         <button className="link" onClick={() => setMode(mode === "login" ? "register" : "login")}>
           {mode === "login" ? "はじめての方はオーナー登録" : "登録済みの方はログイン"}
         </button>
-      </div>
-    </div>
+        <p className="hint">オンライン対戦にはゲームサーバー（npm run dev:server）の起動が必要です。</p>
+        <button className="link" onClick={onBack}>
+          モード選択に戻る
+        </button>
+  </TitleShell>
   );
 }

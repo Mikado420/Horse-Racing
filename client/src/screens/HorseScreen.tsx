@@ -5,13 +5,17 @@ import {
   STAT_KEYS,
   STAT_LABELS,
   STYLE_LABELS,
+  CAREER_TURNS,
   canRace,
   canTrain,
+  careerLeft,
+  retirementBonus,
   formatRaceTime,
   type Horse,
   type StatKey,
 } from "@owners/shared";
-import { api, type HistoryRow } from "../api";
+import type { HistoryRow } from "../api";
+import { useBackend } from "../backend";
 import { Gauge, Notice, StatBar } from "../components";
 import { conditionLabel, yen } from "../format";
 import type { Screen } from "../App";
@@ -36,6 +40,7 @@ export function HorseScreen({
   go: (s: Screen) => void;
   onChanged: () => Promise<void> | void;
 }) {
+  const backend = useBackend();
   const [horse, setHorse] = useState<Horse | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [log, setLog] = useState<{ kind: "info" | "error" | "good"; text: string } | null>(null);
@@ -43,13 +48,13 @@ export function HorseScreen({
 
   const load = useCallback(async () => {
     try {
-      const r = await api.horse(horseId);
+      const r = await backend.horse(horseId);
       setHorse(r.horse);
       setHistory(r.history);
     } catch (e) {
       setLog({ kind: "error", text: (e as Error).message });
     }
-  }, [horseId]);
+  }, [horseId, backend]);
 
   useEffect(() => {
     void load();
@@ -58,7 +63,7 @@ export function HorseScreen({
   const train = async (menu: StatKey) => {
     setBusy(true);
     try {
-      const r = await api.train(horseId, menu);
+      const r = await backend.train(horseId, menu);
       setHorse(r.horse);
       const gains = Object.entries(r.gains)
         .filter(([, v]) => (v ?? 0) > 0)
@@ -74,10 +79,25 @@ export function HorseScreen({
     }
   };
 
+  const retire = async () => {
+    if (!backend.retire) return;
+    if (!window.confirm(`${horse?.name} を引退させますか？　報奨金 ${yen(horse ? retirementBonus(horse) : 0)} を受け取ります。元に戻せません。`)) return;
+    setBusy(true);
+    try {
+      const r = await backend.retire(horseId);
+      await onChanged();
+      window.alert(`引退しました。報奨金 ${yen(r.bonus)} を受け取りました。`);
+      go({ name: "home" });
+    } catch (e) {
+      setLog({ kind: "error", text: (e as Error).message });
+      setBusy(false);
+    }
+  };
+
   const rest = async () => {
     setBusy(true);
     try {
-      const r = await api.rest(horseId);
+      const r = await backend.rest(horseId);
       setHorse(r.horse);
       setLog({ kind: "good", text: `休養しました。疲労 ${r.fatigueDelta}${r.conditionDelta > 0 ? "、調子が上向きました" : ""}` });
       await onChanged();
@@ -103,6 +123,13 @@ export function HorseScreen({
         <h1 className="page-title">{horse.name}</h1>
         <p className="muted">
           {STYLE_LABELS[horse.style]} ・ {horse.races}戦{horse.wins}勝 ・ 獲得賞金 {yen(horse.totalPrize)}
+        </p>
+        <p className="career" aria-label="競走生活">
+          <span className="career-track" aria-hidden>
+            <span style={{ width: `${(Math.min(horse.turns, CAREER_TURNS) / CAREER_TURNS) * 100}%` }} />
+          </span>
+          {careerLeft(horse) > 0 ? `競走生活 残り${careerLeft(horse)}ターン` : "競走生活を終える時期です"}
+          <small className="muted">（調教・休養・出走で1ターン。若いうちほど能力が伸びやすい）</small>
         </p>
       </section>
 
@@ -163,6 +190,11 @@ export function HorseScreen({
             この馬で出走登録
           </button>
           {raceBlocked && <p className="hint">{raceBlocked}</p>}
+          {backend.retire && !horse.retired && (
+            <button className="btn btn-quiet btn-wide" disabled={busy} onClick={retire}>
+              引退させる（報奨金 {yen(retirementBonus(horse))}）
+            </button>
+          )}
         </section>
       </div>
 

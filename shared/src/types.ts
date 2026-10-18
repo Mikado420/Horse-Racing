@@ -71,6 +71,8 @@ export interface Horse {
   condition: number; // -2..2
   /** 故障中なら残り休養回数（0なら健康） */
   injuryRestsLeft: number;
+  /** 経過ターン数（調教・休養・出走で1ずつ進む）。CAREER_TURNS に達すると引退 */
+  turns: number;
   races: number;
   wins: number;
   totalPrize: number;

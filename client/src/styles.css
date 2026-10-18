@@ -920,6 +920,239 @@ input:focus {
   color: #fff;
 }
 
+
+/* ---------- モード選択・オフライン ---------- */
+.mode-pick {
+  display: grid;
+  gap: 0.8rem;
+}
+.mode-btn {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  padding: 0.9rem 1.1rem;
+  margin-top: 0;
+}
+.mode-btn strong {
+  font-size: 1.1rem;
+}
+.mode-btn span {
+  font-weight: 400;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+.mode-badge {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 0.6rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  vertical-align: 0.15em;
+}
+.mode-offline {
+  background: #e7b526;
+  color: var(--ink);
+}
+.mode-online {
+  background: #1e5fa8;
+  color: #fff;
+}
+.file-pick {
+  display: grid;
+  gap: 0.3rem;
+  margin: 1.2rem 0 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.file-pick input {
+  font-size: 0.85rem;
+  padding: 0.4rem;
+}
+select {
+  font: inherit;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.6rem;
+  background: var(--card);
+  color: var(--ink);
+}
+.career {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.career-track {
+  width: 8rem;
+  height: 0.45rem;
+  background: var(--paper-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.career-track span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+.pick-row {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.program-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.program-head .section-title {
+  flex: 1;
+}
+.programs {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.program {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-top: 6px solid var(--turf);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+.program.tier-3 {
+  border-top-color: var(--brass);
+}
+.program.tier-4 {
+  border-top-color: var(--crimson);
+}
+.program-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.program-name strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.25rem;
+}
+.program-stars {
+  color: var(--brass);
+  letter-spacing: 0.05em;
+}
+.program-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.8rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.program-facts > div {
+  display: contents;
+}
+.program-facts dt {
+  color: var(--ink-2);
+}
+.program-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+.estimate {
+  margin: 0;
+  font-size: 0.9rem;
+  background: var(--paper);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+}
+.plus {
+  color: var(--good);
+  font-weight: 700;
+}
+.minus {
+  color: var(--bad);
+  font-weight: 700;
+}
+.result-actions {
+  display: grid;
+}
+.hud-skip {
+  margin-left: auto;
+  background: rgba(251, 252, 249, 0.92);
+}
+.shop-card {
+  cursor: default;
+}
+.shop-card.tier-premium {
+  border-color: var(--brass);
+}
+.shop-apt {
+  font-size: 0.85rem;
+}
+.shop-price {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+}
+.save-panel {
+  margin-top: 2.5rem;
+}
+.save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.file-btn {
+  position: relative;
+  overflow: hidden;
+}
+.file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.lab-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.lab-controls label,
+.lab-grid label {
+  display: grid;
+  gap: 0.2rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.lab-override {
+  margin: 0 0 1rem;
+}
+.lab-override summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.6rem;
+}
+.lab-grid input {
+  width: 100%;
+}
+.lab-table {
+  margin-top: 1.2rem;
+}
+
 /* ---------- スマートフォン ---------- */
 @media (max-width: 760px) {
   .title-screen {

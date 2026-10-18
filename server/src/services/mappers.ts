@@ -22,6 +22,7 @@ export interface HorseRow {
   fatigue: number;
   condition: number;
   injury_rests_left: number;
+  turns: number;
   races: number;
   wins: number;
   total_prize: string | number;
@@ -30,7 +31,7 @@ export interface HorseRow {
 
 export const PLAYER_COLS = "id, username, password_hash, money, total_prize, races, wins";
 export const HORSE_COLS =
-  "id, owner_id, name, template, stats, potential, style, aptitude, fatigue, condition, injury_rests_left, races, wins, total_prize, retired";
+  "id, owner_id, name, template, stats, potential, style, aptitude, fatigue, condition, injury_rests_left, turns, races, wins, total_prize, retired";
 
 export function toPlayer(r: PlayerRow): PlayerProfile {
   return {
@@ -55,6 +56,7 @@ export function toHorse(r: HorseRow): Horse {
     fatigue: r.fatigue,
     condition: r.condition,
     injuryRestsLeft: r.injury_rests_left,
+    turns: r.turns,
     races: r.races,
     wins: r.wins,
     totalPrize: Number(r.total_prize),

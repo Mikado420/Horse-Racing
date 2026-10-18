@@ -14,6 +14,20 @@ import {
 export const FATIGUE_MAX = 100;
 export const RACE_FATIGUE_LIMIT = 80; // これ以上は出走不可
 export const INJURY_REST_COUNT = 3;
+/** 競走生活の長さ（ターン数）。調教・休養・出走のたびに1進む */
+export const CAREER_TURNS = 60;
+
+/** 年齢（経過ターン）による成長のしやすさ。若いほど伸び、晩年は伸びにくい */
+export function growthMultiplier(turns: number): number {
+  if (turns < 15) return 1.2;
+  if (turns < 40) return 1.0;
+  if (turns < 50) return 0.6;
+  return 0.3;
+}
+
+export function careerLeft(h: Horse): number {
+  return Math.max(0, CAREER_TURNS - h.turns);
+}
 
 export interface StarterTemplate {
   id: string;
@@ -31,7 +45,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
     label: "快速タイプ",
     description: "序盤から先頭を奪う逃げ馬。スピード自慢だがスタミナは控えめ。",
     style: "front",
-    base: { speed: 63, stamina: 46, power: 52, guts: 46, wisdom: 48 },
+    base: { speed: 61, stamina: 46, power: 52, guts: 46, wisdom: 48 },
     potential: { speed: 115, stamina: 90, power: 100, guts: 95, wisdom: 100 },
     aptitude: { turf: "A", dirt: "C", sprint: "A", mile: "A", middle: "C", long: "D" },
   },
@@ -49,7 +63,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
     label: "末脚タイプ",
     description: "後方から直線で差し切る差し馬。スタミナと根性に優れる。",
     style: "closer",
-    base: { speed: 51, stamina: 58, power: 49, guts: 56, wisdom: 50 },
+    base: { speed: 52, stamina: 58, power: 49, guts: 56, wisdom: 50 },
     potential: { speed: 105, stamina: 115, power: 100, guts: 110, wisdom: 100 },
     aptitude: { turf: "A", dirt: "C", sprint: "C", mile: "A", middle: "A", long: "B" },
   },
@@ -83,6 +97,7 @@ export function createStarterHorse(
     fatigue: 0,
     condition: 0,
     injuryRestsLeft: 0,
+    turns: 0,
     races: 0,
     wins: 0,
     totalPrize: 0,
@@ -108,6 +123,7 @@ export function clamp(v: number, min: number, max: number): number {
 
 export function canTrain(h: Horse): string | null {
   if (h.retired) return "引退した馬は調教できません";
+  if (careerLeft(h) === 0) return "競走生活を終える時期です。引退させてください";
   if (h.injuryRestsLeft > 0) return `故障中です（あと${h.injuryRestsLeft}回の休養が必要）`;
   if (h.fatigue >= FATIGUE_MAX) return "疲労が限界です。休養させてください";
   return null;
@@ -115,6 +131,7 @@ export function canTrain(h: Horse): string | null {
 
 export function canRace(h: Horse): string | null {
   if (h.retired) return "引退した馬は出走できません";
+  if (careerLeft(h) === 0) return "競走生活を終える時期です。引退させてください";
   if (h.injuryRestsLeft > 0) return "故障中の馬は出走できません";
   if (h.fatigue >= RACE_FATIGUE_LIMIT) return `疲労が${RACE_FATIGUE_LIMIT}以上のため出走できません`;
   return null;
@@ -147,8 +164,8 @@ function gainWithCap(current: number, cap: number, raw: number): number {
 export function applyTraining(h: Horse, menu: TrainingMenu, rng: Rng): TrainingResult {
   const err = canTrain(h);
   if (err) throw new Error(err);
-  const horse: Horse = { ...h, stats: { ...h.stats } };
-  const condMul = 1 + 0.1 * horse.condition;
+  const horse: Horse = { ...h, stats: { ...h.stats }, turns: h.turns + 1 };
+  const condMul = (1 + 0.1 * horse.condition) * growthMultiplier(h.turns);
   const fatigueMul = 1 - horse.fatigue / 200;
   const gains: Partial<Stats> = {};
 
@@ -186,7 +203,7 @@ export interface RestResult {
 
 export function applyRest(h: Horse, rng: Rng): RestResult {
   if (h.retired) throw new Error("引退した馬は休養できません");
-  const horse: Horse = { ...h };
+  const horse: Horse = { ...h, turns: h.turns + 1 };
   const before = horse.fatigue;
   horse.fatigue = clamp(horse.fatigue - 40, 0, FATIGUE_MAX);
   let conditionDelta = 0;
@@ -198,7 +215,7 @@ export function applyRest(h: Horse, rng: Rng): RestResult {
 
 /** レース後の状態変化 */
 export function applyRaceAftermath(h: Horse, position: number, prize: number, rng: Rng): Horse {
-  const horse: Horse = { ...h };
+  const horse: Horse = { ...h, turns: h.turns + 1 };
   horse.fatigue = clamp(horse.fatigue + randInt(rng, 22, 30), 0, FATIGUE_MAX);
   const r = rng();
   const delta = position === 1 ? (r < 0.5 ? 1 : 0) : r < 0.3 ? -1 : r < 0.45 ? 1 : 0;

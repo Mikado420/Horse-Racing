@@ -40,8 +40,8 @@ async function lockPlayer(tx: Queryable, playerId: string) {
 async function saveHorseState(tx: Queryable, h: Horse) {
   await tx.query(
     `UPDATE horses SET stats = $2, fatigue = $3, condition = $4, injury_rests_left = $5,
-       races = $6, wins = $7, total_prize = $8 WHERE id = $1`,
-    [h.id, JSON.stringify(h.stats), h.fatigue, h.condition, h.injuryRestsLeft, h.races, h.wins, h.totalPrize],
+       races = $6, wins = $7, total_prize = $8, turns = $9 WHERE id = $1`,
+    [h.id, JSON.stringify(h.stats), h.fatigue, h.condition, h.injuryRestsLeft, h.races, h.wins, h.totalPrize, h.turns],
   );
 }
 

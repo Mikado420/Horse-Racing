@@ -2,13 +2,10 @@
 import {
   ECONOMY,
   MIN_RUNNERS,
-  applyRaceAftermath,
   canRace,
-  conditionsFromSeed,
-  createRng,
   prizeFor,
   purseFor,
-  simulateRace,
+  resolveRace,
   type CourseDef,
   type Horse,
   type RaceConditions,
@@ -103,28 +100,22 @@ export async function settleRace(
         return { status: "cancelled" as const, raceId, reason: "出走可能な馬が不足したためレースは中止になりました", scratched };
       }
 
-      const conditions = conditionsFromSeed(seed, course);
-      const sim = simulateRace(
-        valid.map((v) => ({
-          entryId: v.horse.id,
-          gate: v.entry.gate,
-          stats: v.horse.stats,
-          style: v.horse.style,
-          aptitude: v.horse.aptitude,
-          fatigue: v.horse.fatigue,
-          condition: v.horse.condition,
-        })),
-        conditions,
-        seed,
-      );
+      // 着順・賞金・馬の状態変化はオフライン版と共通の resolveRace で決める
       const fieldSize = valid.length;
-      const runners: SettledRunner[] = valid.map((v) => ({
-        gate: v.entry.gate,
-        playerId: v.entry.playerId,
-        playerName: v.playerName,
-        horseId: v.horse.id,
-        horseName: v.horse.name,
-        style: v.horse.style,
+      const resolved = resolveRace(
+        valid.map((v) => ({ horse: v.horse, gate: v.entry.gate, ownerId: v.entry.playerId, ownerName: v.playerName })),
+        course,
+        seed,
+        prizeFor,
+      );
+      const { conditions, sim } = resolved;
+      const runners: SettledRunner[] = resolved.runners.map((e) => ({
+        gate: e.gate,
+        playerId: e.ownerId!,
+        playerName: e.ownerName,
+        horseId: e.horse.id,
+        horseName: e.horse.name,
+        style: e.horse.style,
       }));
 
       // ここで主キー重複なら既に精算済み → 例外でロールバック
@@ -146,37 +137,36 @@ export async function settleRace(
         ],
       );
 
-      const afterRng = createRng(seed ^ 0x5bd1e995);
       const results: ResultRow[] = [];
-      for (const r of sim.results) {
-        const v = valid.find((x) => x.horse.id === r.entryId)!;
-        const prize = prizeFor(r.position, fieldSize);
+      for (const r of resolved.results) {
+        const playerId = r.ownerId!;
         await tx.query(
           `INSERT INTO race_entries (race_id, horse_id, player_id, gate, position, time_ms, margin_lengths, prize, horse_name, player_name)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [raceId, v.horse.id, v.entry.playerId, r.gate, r.position, r.timeMs, r.marginLengths, prize, v.horse.name, v.playerName],
+          [raceId, r.horseId, playerId, r.gate, r.position, r.timeMs, r.marginLengths, r.prize, r.horseName, r.ownerName],
         );
         await tx.query(
           `UPDATE players SET money = money - $2 + $3, total_prize = total_prize + $3,
              races = races + 1, wins = wins + $4 WHERE id = $1`,
-          [v.entry.playerId, ECONOMY.entryFee, prize, r.position === 1 ? 1 : 0],
-        );
-        const after = applyRaceAftermath(v.horse, r.position, prize, afterRng);
-        await tx.query(
-          `UPDATE horses SET fatigue = $2, condition = $3, races = $4, wins = $5, total_prize = $6 WHERE id = $1`,
-          [after.id, after.fatigue, after.condition, after.races, after.wins, after.totalPrize],
+          [playerId, ECONOMY.entryFee, r.prize, r.position === 1 ? 1 : 0],
         );
         results.push({
           position: r.position,
           gate: r.gate,
-          horseId: v.horse.id,
-          horseName: v.horse.name,
-          playerId: v.entry.playerId,
-          playerName: v.playerName,
+          horseId: r.horseId,
+          horseName: r.horseName,
+          playerId,
+          playerName: r.ownerName,
           timeMs: r.timeMs,
           marginLengths: r.marginLengths,
-          prize,
+          prize: r.prize,
         });
+      }
+      for (const after of resolved.horsesAfter) {
+        await tx.query(
+          `UPDATE horses SET fatigue = $2, condition = $3, races = $4, wins = $5, total_prize = $6, turns = $7 WHERE id = $1`,
+          [after.id, after.fatigue, after.condition, after.races, after.wins, after.totalPrize, after.turns],
+        );
       }
       return { status: "finished" as const, raceId, conditions, runners, sim, results };
     });

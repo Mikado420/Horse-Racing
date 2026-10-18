@@ -148,3 +148,35 @@ test("着差とタイムの表記", () => {
   assert.equal(marginLabel(12), "大差");
   assert.equal(formatRaceTime(94_321), "1:34.3");
 });
+
+import { generateCpuField, resolveRace, findProgram, programPrize, RACE_PROGRAMS, createStarterHorse, createRng } from "../src/index";
+
+test("CPU馬はシードで再現でき、番組が上のクラスほど強い", () => {
+  const p = findProgram("allowance")!;
+  assert.deepEqual(generateCpuField(p, 7, 42), generateCpuField(p, 7, 42));
+  const avg = (id: string) => {
+    const f = generateCpuField(findProgram(id)!, 50, 1);
+    return f.reduce((a, h) => a + h.stats.speed, 0) / f.length;
+  };
+  const avgs = RACE_PROGRAMS.map((x) => avg(x.id));
+  for (let i = 1; i < avgs.length; i++) assert.ok(avgs[i] > avgs[i - 1]);
+  assert.equal(new Set(generateCpuField(p, 7, 3).map((h) => h.name)).size, 7, "馬名は重複しない");
+});
+
+test("resolveRace：所有馬だけ状態が更新され、賞金は指定の関数で決まる", () => {
+  const p = findProgram("maiden")!;
+  const mine = createStarterHorse(STARTER_TEMPLATES[0], { id: "me", ownerId: "p" }, "ジブンノウマ", createRng(1));
+  const cpus = generateCpuField(p, 3, 9);
+  const r = resolveRace(
+    [{ horse: mine, gate: 2, ownerId: "p", ownerName: "私" }, ...cpus.map((h, i) => ({ horse: h, gate: i === 0 ? 1 : i + 2, ownerId: null, ownerName: "CPU" }))],
+    p.course,
+    77,
+    (pos) => programPrize(p, pos),
+  );
+  assert.equal(r.results.length, 4);
+  assert.equal(r.horsesAfter.length, 1);
+  assert.equal(r.horsesAfter[0].id, "me");
+  assert.equal(r.horsesAfter[0].races, 1);
+  assert.deepEqual(r.runners.map((x) => x.gate), [1, 2, 3, 4]);
+  for (const x of r.results) assert.equal(x.prize, programPrize(p, x.position));
+});

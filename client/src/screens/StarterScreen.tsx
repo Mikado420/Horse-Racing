@@ -7,12 +7,13 @@ import {
   type PlayerProfile,
   type StarterTemplate,
 } from "@owners/shared";
-import { api } from "../api";
+import { useBackend } from "../backend";
 import { Notice, StatBar } from "../components";
 
 const NAME_IDEAS = ["ミドリノカゼ", "ハルカゼダイヤ", "サクラコンパス", "ユウヒノテラス", "アオイホシ", "シロガネステップ"];
 
 export function StarterScreen({ player, onSelected }: { player: PlayerProfile; onSelected: () => void }) {
+  const backend = useBackend();
   const [templates, setTemplates] = useState<StarterTemplate[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [name, setName] = useState(() => NAME_IDEAS[Math.floor(Math.random() * NAME_IDEAS.length)]);
@@ -20,8 +21,8 @@ export function StarterScreen({ player, onSelected }: { player: PlayerProfile; o
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.gameInfo().then((g) => setTemplates(g.starters), (e) => setError(e.message));
-  }, []);
+    backend.starters().then(setTemplates, (e) => setError(e.message));
+  }, [backend]);
 
   const nameError = validateHorseName(name);
 
@@ -30,7 +31,7 @@ export function StarterScreen({ player, onSelected }: { player: PlayerProfile; o
     setBusy(true);
     setError(null);
     try {
-      await api.selectStarter(picked, name.trim());
+      await backend.selectStarter(picked, name.trim());
       onSelected();
     } catch (e) {
       setError((e as Error).message);

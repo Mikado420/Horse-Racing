@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { STYLE_LABELS, canRace } from "@owners/shared";
-import { api, type MeResponse, type MyRace } from "../api";
+import type { MeResponse, MyRace } from "../api";
+import { useBackend } from "../backend";
 import { Gauge } from "../components";
 import { conditionLabel, yen } from "../format";
 import type { Screen } from "../App";
 
-export function HomeScreen({ me, go, onLogout }: { me: MeResponse; go: (s: Screen) => void; onLogout: () => void }) {
+export function HomeScreen({ me, go, onLogout, footer }: { me: MeResponse; go: (s: Screen) => void; onLogout: () => void; footer?: ReactNode }) {
+  const backend = useBackend();
   const [races, setRaces] = useState<MyRace[] | null>(null);
   useEffect(() => {
-    api.myRaces().then((r) => setRaces(r.races), () => setRaces([]));
-  }, []);
+    backend.myRaces().then(setRaces, () => setRaces([]));
+  }, [backend, me]);
   const p = me.player;
 
   return (
@@ -22,7 +24,7 @@ export function HomeScreen({ me, go, onLogout }: { me: MeResponse; go: (s: Scree
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => go({ name: "race" })}>
-          レースに出走登録
+          {backend.mode === "offline" ? "レースに出る" : "レースに出走登録"}
         </button>
       </section>
 
@@ -89,11 +91,13 @@ export function HomeScreen({ me, go, onLogout }: { me: MeResponse; go: (s: Scree
         </table>
       )}
 
-      <p className="footer-actions">
-        <button className="link" onClick={onLogout}>
-          ログアウト
-        </button>
-      </p>
+      {footer ?? (
+        <p className="footer-actions">
+          <button className="link" onClick={onLogout}>
+            ログアウト
+          </button>
+        </p>
+      )}
     </div>
   );
 }

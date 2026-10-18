@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, getToken, setToken, type MeResponse } from "./api";
+import { BackendContext, loadMode, onlineBackend, saveMode, type GameMode } from "./backend";
 import { yen } from "./format";
+import { TitleScreen } from "./screens/TitleScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { StarterScreen } from "./screens/StarterScreen";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -8,19 +10,99 @@ import { HorseScreen } from "./screens/HorseScreen";
 import { RaceScreen } from "./screens/RaceScreen";
 import { RankingScreen } from "./screens/RankingScreen";
 import { hasPendingReconnect, useRaceConnection } from "./net/raceClient";
+import { useOfflineGame, type OfflineGame } from "./offline/useOfflineGame";
+import { NewGameScreen } from "./offline/NewGameScreen";
+import { OfflineRaceScreen } from "./offline/OfflineRaceScreen";
+import { ShopScreen } from "./offline/ShopScreen";
+import { RecordsScreen } from "./offline/RecordsScreen";
+import { LabScreen } from "./offline/LabScreen";
+import { SaveDataPanel } from "./offline/SaveDataPanel";
 
 export type Screen =
   | { name: "home" }
   | { name: "horse"; horseId: string }
   | { name: "race"; horseId?: string }
-  | { name: "rankings" };
+  | { name: "rankings" }
+  | { name: "shop" }
+  | { name: "records" }
+  | { name: "lab" };
 
 export function App() {
+  const [mode, setModeState] = useState<GameMode | null>(() => (hasPendingReconnect() ? "online" : loadMode()));
+  // フックは常に同じ順で呼ぶ（どちらのモードでも両方用意しておく）
+  const offline = useOfflineGame();
+  const conn = useRaceConnection();
+
+  const setMode = (m: GameMode | null) => {
+    saveMode(m);
+    setModeState(m);
+  };
+
+  if (mode === null) return <TitleScreen onPick={setMode} />;
+  if (mode === "offline") return <OfflineApp game={offline} onSwitchMode={() => setMode(null)} />;
+  return <OnlineApp conn={conn} onSwitchMode={() => setMode(null)} />;
+}
+
+/* ---------------- オフライン（1人用） ---------------- */
+
+function OfflineApp({ game, onSwitchMode }: { game: OfflineGame; onSwitchMode: () => void }) {
+  const [screen, setScreen] = useState<Screen>({ name: "home" });
+  const save = game.save;
+
+  if (!save) {
+    return (
+      <NewGameScreen
+        loadError={game.loadError}
+        onStart={(n) => {
+          game.newGame(n);
+          setScreen({ name: "home" });
+        }}
+        onImport={(t) => game.importText(t)}
+        onBack={onSwitchMode}
+      />
+    );
+  }
+  const me: MeResponse = { player: save.player, horses: save.horses.filter((h) => !h.retired) };
+
+  return (
+    <BackendContext.Provider value={game.backend}>
+      {save.horses.length === 0 ? (
+        <StarterScreen player={save.player} onSelected={() => setScreen({ name: "home" })} />
+      ) : (
+        <Shell
+          mode="offline"
+          screen={screen}
+          go={setScreen}
+          owner={save.player.username}
+          money={save.player.money}
+          nav={[
+            ["home", "厩舎"],
+            ["race", "レース"],
+            ["shop", "馬を買う"],
+            ["records", "記録"],
+            ["lab", "検証"],
+          ]}
+        >
+          {screen.name === "home" && (
+            <HomeScreen me={me} go={setScreen} onLogout={onSwitchMode} footer={<SaveDataPanel game={game} onSwitchMode={onSwitchMode} />} />
+          )}
+          {screen.name === "horse" && <HorseScreen horseId={screen.horseId} money={save.player.money} go={setScreen} onChanged={() => undefined} />}
+          {screen.name === "race" && <OfflineRaceScreen game={game} initialHorseId={screen.horseId} go={setScreen} />}
+          {screen.name === "shop" && <ShopScreen game={game} go={setScreen} />}
+          {screen.name === "records" && <RecordsScreen game={game} />}
+          {screen.name === "lab" && <LabScreen game={game} />}
+        </Shell>
+      )}
+    </BackendContext.Provider>
+  );
+}
+
+/* ---------------- オンライン対戦 ---------------- */
+
+function OnlineApp({ conn, onSwitchMode }: { conn: ReturnType<typeof useRaceConnection>; onSwitchMode: () => void }) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>(() => (hasPendingReconnect() ? { name: "race" } : { name: "home" }));
-  // レース接続は画面を移動しても維持する（観戦中に厩舎を見に行っても切れない）
-  const conn = useRaceConnection();
   const inRace = conn.status === "connected" || conn.status === "reconnecting";
 
   const refresh = useCallback(async () => {
@@ -51,40 +133,80 @@ export function App() {
   };
 
   if (loading) return <div className="boot">読み込み中…</div>;
-  if (!me) return <LoginScreen onLoggedIn={refresh} />;
-  if (me.horses.length === 0) return <StarterScreen player={me.player} onSelected={refresh} />;
+  if (!me) return <LoginScreen onLoggedIn={refresh} onBack={onSwitchMode} />;
 
-  const go = (s: Screen) => setScreen(s);
+  return (
+    <BackendContext.Provider value={onlineBackend}>
+      {me.horses.length === 0 ? (
+        <StarterScreen player={me.player} onSelected={refresh} />
+      ) : (
+        <Shell
+          mode="online"
+          screen={screen}
+          go={setScreen}
+          owner={me.player.username}
+          money={me.player.money}
+          liveRace={inRace}
+          nav={[
+            ["home", "厩舎"],
+            ["race", "レース"],
+            ["rankings", "ランキング"],
+          ]}
+        >
+          {screen.name === "home" && <HomeScreen me={me} go={setScreen} onLogout={logout} />}
+          {screen.name === "horse" && <HorseScreen horseId={screen.horseId} money={me.player.money} go={setScreen} onChanged={refresh} />}
+          {screen.name === "race" && <RaceScreen me={me} conn={conn} initialHorseId={screen.horseId} go={setScreen} onChanged={refresh} />}
+          {screen.name === "rankings" && <RankingScreen myId={me.player.id} />}
+        </Shell>
+      )}
+    </BackendContext.Provider>
+  );
+}
 
+/* ---------------- 共通の枠 ---------------- */
+
+function Shell({
+  mode,
+  screen,
+  go,
+  owner,
+  money,
+  nav,
+  liveRace,
+  children,
+}: {
+  mode: GameMode;
+  screen: Screen;
+  go: (s: Screen) => void;
+  owner: string;
+  money: number;
+  nav: [Screen["name"], string][];
+  liveRace?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className={`app ${screen.name === "race" ? "app-race" : ""}`}>
       <header className="topbar">
         <button className="brand" onClick={() => go({ name: "home" })}>
           競走馬オーナーズ
+          <span className={`mode-badge mode-${mode}`}>{mode === "offline" ? "ひとりで" : "オンライン"}</span>
         </button>
         <nav className="topnav" aria-label="メインメニュー">
-          <button aria-current={screen.name === "home"} onClick={() => go({ name: "home" })}>
-            厩舎
-          </button>
-          <button aria-current={screen.name === "race"} onClick={() => go({ name: "race" })}>
-            レース
-            {inRace && screen.name !== "race" && <span className="live-dot" aria-label="参加中のレースがあります" />}
-          </button>
-          <button aria-current={screen.name === "rankings"} onClick={() => go({ name: "rankings" })}>
-            ランキング
-          </button>
+          {nav.map(([name, label]) => (
+            <button key={name} aria-current={screen.name === name} onClick={() => go({ name } as Screen)}>
+              {label}
+              {name === "race" && liveRace && screen.name !== "race" && (
+                <span className="live-dot" aria-label="参加中のレースがあります" />
+              )}
+            </button>
+          ))}
         </nav>
         <div className="purse" title="所持金">
-          <span className="purse-owner">{me.player.username}</span>
-          <strong>{yen(me.player.money)}</strong>
+          <span className="purse-owner">{owner}</span>
+          <strong>{yen(money)}</strong>
         </div>
       </header>
-      <main className="main">
-        {screen.name === "home" && <HomeScreen me={me} go={go} onLogout={logout} />}
-        {screen.name === "horse" && <HorseScreen horseId={screen.horseId} money={me.player.money} go={go} onChanged={refresh} />}
-        {screen.name === "race" && <RaceScreen me={me} conn={conn} initialHorseId={screen.horseId} go={go} onChanged={refresh} />}
-        {screen.name === "rankings" && <RankingScreen myId={me.player.id} />}
-      </main>
+      <main className="main">{children}</main>
     </div>
   );
 }

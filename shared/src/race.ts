@@ -51,7 +51,7 @@ export const SIM_DT = 0.05;
 export const SAMPLE_DT = 0.25;
 export const HORSE_LENGTH_M = 2.4;
 
-const GRADE_MUL: Record<Grade, number> = { A: 1.0, B: 0.97, C: 0.93, D: 0.88 };
+const GRADE_MUL: Record<Grade, number> = { A: 1.0, B: 0.988, C: 0.972, D: 0.95 };
 const GOING_INDEX: Record<Going, number> = { good: 0, yielding: 1, soft: 2, heavy: 3 };
 
 interface StyleProfile {
@@ -87,8 +87,8 @@ export function conditionsFromSeed(seed: number, course: CourseDef): RaceConditi
 
 /** 能力・適性・状態から算出した、その馬の実効値（表示・テスト用にも公開） */
 export function effectiveMultiplier(r: RaceRunnerInput, cond: RaceConditions): number {
-  const condMul = 1 + 0.025 * r.condition;
-  const fatigueMul = 1 - 0.0015 * r.fatigue;
+  const condMul = 1 + 0.012 * r.condition;
+  const fatigueMul = 1 - 0.0007 * r.fatigue;
   const surfaceMul = GRADE_MUL[r.aptitude[cond.course.surface]];
   const distMul = GRADE_MUL[r.aptitude[distanceBand(cond.course.distance)]];
   return condMul * fatigueMul * surfaceMul * distMul;
@@ -127,7 +127,7 @@ export function simulateRace(
     return {
       input,
       mul,
-      top: (16.3 + 0.022 * s.speed) * mul * goingPenalty * form,
+      top: (15.9 + 0.03 * s.speed) * mul * goingPenalty * form,
       accel: (1.6 + 0.016 * s.power) * mul,
       stamina: (500 + 12 * s.stamina) * (1 - input.fatigue * 0.002),
       d: 0,

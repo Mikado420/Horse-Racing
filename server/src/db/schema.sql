@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS horses (
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS horses_owner ON horses (owner_id);
+-- v0.2: 競走生活のターン数
+ALTER TABLE horses ADD COLUMN IF NOT EXISTS turns integer NOT NULL DEFAULT 0;
 
 -- 確定したレース。id はロビー生成時に決まり、主キー制約で「同じレースの二重精算」を防ぐ
 CREATE TABLE IF NOT EXISTS races (
