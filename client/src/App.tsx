@@ -10,27 +10,20 @@ import { HorseScreen } from "./screens/HorseScreen";
 import { RaceScreen } from "./screens/RaceScreen";
 import { RankingScreen } from "./screens/RankingScreen";
 import { hasPendingReconnect, useRaceConnection } from "./net/raceClient";
-import { useOfflineGame, type OfflineGame } from "./offline/useOfflineGame";
-import { NewGameScreen } from "./offline/NewGameScreen";
-import { OfflineRaceScreen } from "./offline/OfflineRaceScreen";
-import { ShopScreen } from "./offline/ShopScreen";
-import { RecordsScreen } from "./offline/RecordsScreen";
-import { LabScreen } from "./offline/LabScreen";
-import { SaveDataPanel } from "./offline/SaveDataPanel";
+import { useOwnerGame } from "./offline/useOwnerGame";
+import { OwnerApp } from "./owner/OwnerApp";
 
+/** オンライン対戦の画面（オフラインの馬主モードは owner/OwnerApp.tsx） */
 export type Screen =
   | { name: "home" }
   | { name: "horse"; horseId: string }
   | { name: "race"; horseId?: string }
-  | { name: "rankings" }
-  | { name: "shop" }
-  | { name: "records" }
-  | { name: "lab" };
+  | { name: "rankings" };
 
 export function App() {
   const [mode, setModeState] = useState<GameMode | null>(() => (!OFFLINE_ONLY && hasPendingReconnect() ? "online" : loadMode()));
   // フックは常に同じ順で呼ぶ（どちらのモードでも両方用意しておく）
-  const offline = useOfflineGame();
+  const offline = useOwnerGame();
   const conn = useRaceConnection();
 
   const setMode = (m: GameMode | null) => {
@@ -39,62 +32,8 @@ export function App() {
   };
 
   if (mode === null) return <TitleScreen onPick={setMode} />;
-  if (mode === "offline") return <OfflineApp game={offline} onSwitchMode={() => setMode(null)} />;
+  if (mode === "offline") return <OwnerApp game={offline} onSwitchMode={() => setMode(null)} />;
   return <OnlineApp conn={conn} onSwitchMode={() => setMode(null)} />;
-}
-
-/* ---------------- オフライン（1人用） ---------------- */
-
-function OfflineApp({ game, onSwitchMode }: { game: OfflineGame; onSwitchMode: () => void }) {
-  const [screen, setScreen] = useState<Screen>({ name: "home" });
-  const save = game.save;
-
-  if (!save) {
-    return (
-      <NewGameScreen
-        loadError={game.loadError}
-        onStart={(n) => {
-          game.newGame(n);
-          setScreen({ name: "home" });
-        }}
-        onImport={(t) => game.importText(t)}
-        onBack={onSwitchMode}
-      />
-    );
-  }
-  const me: MeResponse = { player: save.player, horses: save.horses.filter((h) => !h.retired) };
-
-  return (
-    <BackendContext.Provider value={game.backend}>
-      {save.horses.length === 0 ? (
-        <StarterScreen player={save.player} onSelected={() => setScreen({ name: "home" })} />
-      ) : (
-        <Shell
-          mode="offline"
-          screen={screen}
-          go={setScreen}
-          owner={save.player.username}
-          money={save.player.money}
-          nav={[
-            ["home", "厩舎"],
-            ["race", "レース"],
-            ["shop", "馬を買う"],
-            ["records", "記録"],
-            ["lab", "検証"],
-          ]}
-        >
-          {screen.name === "home" && (
-            <HomeScreen me={me} go={setScreen} onLogout={onSwitchMode} footer={<SaveDataPanel game={game} onSwitchMode={onSwitchMode} />} />
-          )}
-          {screen.name === "horse" && <HorseScreen horseId={screen.horseId} money={save.player.money} go={setScreen} onChanged={() => undefined} />}
-          {screen.name === "race" && <OfflineRaceScreen game={game} initialHorseId={screen.horseId} go={setScreen} />}
-          {screen.name === "shop" && <ShopScreen game={game} go={setScreen} />}
-          {screen.name === "records" && <RecordsScreen game={game} />}
-          {screen.name === "lab" && <LabScreen game={game} />}
-        </Shell>
-      )}
-    </BackendContext.Provider>
-  );
 }
 
 /* ---------------- オンライン対戦 ---------------- */

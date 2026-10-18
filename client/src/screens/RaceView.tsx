@@ -62,7 +62,8 @@ export function RaceView({ race, now: nowFn, results, myId, reconnecting, onBack
         <div className="hud-race">
           <strong>{race.courseName}</strong>
           <span>
-            芝{race.distance}m ・ {WEATHER_LABELS[race.weather]} ・ 馬場{GOING_LABELS[race.going]}
+            {race.surface === "dirt" ? "ダート" : "芝"}
+            {race.distance}m ・ {WEATHER_LABELS[race.weather]} ・ 馬場{GOING_LABELS[race.going]}
           </span>
         </div>
         <div className="hud-remain">

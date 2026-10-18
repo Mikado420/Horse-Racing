@@ -31,7 +31,7 @@ export function RaceScene({ race, serverNow, camera, highlight }: Props) {
         shadow-camera-top={300}
         shadow-camera-bottom={-300}
       />
-      <Course course={DEFAULT_COURSE} />
+      <Course course={race.course ?? DEFAULT_COURSE} />
       <Runners race={race} serverNow={serverNow} camera={camera} highlight={highlight} />
     </Canvas>
   );
@@ -45,7 +45,8 @@ function Course({ course }: { course: CourseDef }) {
   const markers = useMemo(() => {
     const list: { s: number; label: string }[] = [];
     for (let remain = course.distance - 200; remain >= 200; remain -= 200) {
-      list.push({ s: course.distance - remain, label: String(remain) });
+      // ゴール板を位置0とする内ラチ上の位置（ゴールまで remain の地点）
+      list.push({ s: -remain, label: String(remain) });
     }
     return list;
   }, [course]);
@@ -61,7 +62,7 @@ function Course({ course }: { course: CourseDef }) {
       </mesh>
       {/* 走路 */}
       <mesh geometry={turf} position={[0, 0.01, 0]} receiveShadow>
-        <meshLambertMaterial color="#3E9A52" side={THREE.DoubleSide} />
+        <meshLambertMaterial color={course.surface === "dirt" ? "#A9825A" : "#3E9A52"} side={THREE.DoubleSide} />
       </mesh>
       <primitive object={innerRail} />
       <primitive object={outerRail} />
@@ -179,11 +180,15 @@ function Runners({ race, serverNow, camera, highlight }: Props) {
   const prevDist = useRef<number[]>([]);
   const camTarget = useRef(new THREE.Vector3(0, 0, 0));
   const { camera: cam } = useThree();
-  const course = DEFAULT_COURSE;
+  const course = race.course ?? DEFAULT_COURSE;
   const n = race.runners.length;
+  // 走行距離 d（スタートから）→ 内ラチ上の位置（ゴール板が0）
+  const railS = (d: number) => d - race.distance;
 
-  // 内ラチからの位置：枠順に並んだ状態から、序盤で内へ寄っていく
+  // 内ラチからの位置：計算結果があればそれを使い、なければ枠順から序盤で内へ寄せる
+  const lanesNow = useRef<number[]>([]);
   const laneAt = (i: number, d: number) => {
+    if (race.lanes) return lanesNow.current[i] ?? 1;
     const settle = Math.min(1, Math.max(0, d / 450));
     const spacing = 1.6 * (1 - 0.45 * settle * settle * (3 - 2 * settle));
     return 1.2 + i * spacing;
@@ -192,12 +197,13 @@ function Runners({ race, serverNow, camera, highlight }: Props) {
   useFrame((state, delta) => {
     const t = Math.max(0, ((serverNow() - race.startAt) / 1000) * race.replaySpeed);
     const dist = distancesAt(race.frames, race.sampleDt, t);
+    if (race.lanes) lanesNow.current = distancesAt(race.lanes, race.sampleDt, t);
     let leader = 0;
     for (let i = 0; i < n; i++) {
       const g = groups.current[i];
       if (!g) continue;
       const d = dist[i];
-      const p = trackPoint(course, d, laneAt(i, d));
+      const p = trackPoint(course, railS(d), laneAt(i, d));
       g.position.set(p.x, 0, p.z);
       g.rotation.y = -p.heading;
       // 脚の動き：速度に応じて回転
@@ -215,13 +221,13 @@ function Runners({ race, serverNow, camera, highlight }: Props) {
     // カメラ
     const focusIdx = camera === "mine" && highlight >= 0 ? highlight : leader;
     const fd = dist[focusIdx] ?? 0;
-    const fp = trackPoint(course, fd, laneAt(focusIdx, fd));
+    const fp = trackPoint(course, railS(fd), laneAt(focusIdx, fd));
     const k = 1 - Math.exp(-delta * 2.5);
     if (camera === "overview") {
       camTarget.current.lerp(new THREE.Vector3(0, 0, 0), k);
       cam.position.lerp(new THREE.Vector3(0, 230, 330), k);
     } else {
-      const outward = trackPoint(course, fd, laneAt(focusIdx, fd) + 30);
+      const outward = trackPoint(course, railS(fd), laneAt(focusIdx, fd) + 30);
       const dirX = Math.cos(fp.heading);
       const dirZ = Math.sin(fp.heading);
       const desired = new THREE.Vector3(outward.x - dirX * 14, 11, outward.z - dirZ * 14);

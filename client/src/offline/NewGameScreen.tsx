@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Notice } from "../components";
 import { TitleShell } from "../screens/TitleScreen";
-import { validateOwnerName } from "./engine";
+import { validateOwnerName } from "@owners/shared";
 import { readFileText } from "./saveFile";
 
 export function NewGameScreen({
@@ -36,7 +36,7 @@ export function NewGameScreen({
 
   return (
     <TitleShell>
-      <p className="title-lead">厩舎の名前を決めて、最初の1頭を迎えましょう。</p>
+      <p className="title-lead">馬主として名乗りを上げ、最初の1頭を迎えましょう。馬の本当の能力は誰にも分かりません。調教師の報告とレースの内容から、才能を見極めていきます。</p>
       {loadError && <Notice kind="error">{loadError}</Notice>}
       <form className="form" onSubmit={submit}>
         <label>

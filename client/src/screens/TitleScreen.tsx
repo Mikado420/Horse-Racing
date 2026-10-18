@@ -23,11 +23,11 @@ export function TitleShell({ children }: { children: ReactNode }) {
 export function TitleScreen({ onPick }: { onPick: (m: GameMode) => void }) {
   return (
     <TitleShell>
-      <p className="title-lead">馬を育て、出走させ、賞金を積み上げる。</p>
+      <p className="title-lead">馬主として馬を厩舎に預け、隠れた才能を見極め、レースで結果を出す。</p>
       <div className="mode-pick">
         <button className="btn btn-primary btn-wide mode-btn" onClick={() => onPick("offline")}>
           <strong>ひとりで遊ぶ</strong>
-          <span>CPU馬とのレース。データはこのブラウザに保存されます</span>
+          <span>馬主として厩舎に預け、CPU馬と競う。データはこのブラウザに保存されます</span>
         </button>
         {OFFLINE_ONLY ? (
           <p className="hint">この公開版はひとりで遊ぶモードのみです。オンライン対戦はゲームサーバーを起動した環境で遊べます。</p>

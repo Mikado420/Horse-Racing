@@ -10,3 +10,4 @@ export * from "./programs";
 export * from "./cpu";
 export * from "./resolve";
 export * from "./market";
+export * from "./owner";

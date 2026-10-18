@@ -1,6 +1,6 @@
 // サーバー ⇔ クライアント間のメッセージ定義
 
-import type { Going, Weather } from "./types";
+import type { CourseDef, Going, Weather } from "./types";
 
 export const ROOM_NAME = "race";
 
@@ -45,6 +45,10 @@ export interface RaceStartMsg {
   durationSec: number;
   /** finishOrder[k] = k着馬の runners インデックス（再生中の順位表示に使う） */
   finishOrder: number[];
+  /** 各馬の内ラチからの位置(m)。frames と同じ並び（馬主モードのみ。なければ描画側で決める） */
+  lanes?: number[][];
+  /** 走るコース（馬主モードのみ。なければ既定のコース） */
+  course?: CourseDef;
   /** 再生開始のサーバー時刻(ms) */
   startAt: number;
   /** 再生速度（2なら実時間の2倍速） */

@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { Notice } from "../components";
 import { downloadText, readFileText, saveFileName } from "./saveFile";
-import type { OfflineGame } from "./useOfflineGame";
+import type { OwnerGame } from "./useOwnerGame";
 
-export function SaveDataPanel({ game, onSwitchMode }: { game: OfflineGame; onSwitchMode: () => void }) {
+export function SaveDataPanel({ game, onSwitchMode }: { game: OwnerGame; onSwitchMode: () => void }) {
   const [msg, setMsg] = useState<{ kind: "good" | "error"; text: string } | null>(null);
   const save = game.save!;
 
