@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, getToken, setToken, type MeResponse } from "./api";
-import { BackendContext, loadMode, onlineBackend, saveMode, type GameMode } from "./backend";
+import { BackendContext, OFFLINE_ONLY, loadMode, onlineBackend, saveMode, type GameMode } from "./backend";
 import { yen } from "./format";
 import { TitleScreen } from "./screens/TitleScreen";
 import { LoginScreen } from "./screens/LoginScreen";
@@ -28,7 +28,7 @@ export type Screen =
   | { name: "lab" };
 
 export function App() {
-  const [mode, setModeState] = useState<GameMode | null>(() => (hasPendingReconnect() ? "online" : loadMode()));
+  const [mode, setModeState] = useState<GameMode | null>(() => (!OFFLINE_ONLY && hasPendingReconnect() ? "online" : loadMode()));
   // フックは常に同じ順で呼ぶ（どちらのモードでも両方用意しておく）
   const offline = useOfflineGame();
   const conn = useRaceConnection();

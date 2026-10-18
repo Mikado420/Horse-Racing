@@ -45,10 +45,14 @@ export const onlineBackend: Backend = {
 export const BackendContext = createContext<Backend>(onlineBackend);
 export const useBackend = () => useContext(BackendContext);
 
+/** GitHub Pages 版などサーバーのない公開ではオフラインのみ */
+export const OFFLINE_ONLY = import.meta.env.VITE_OFFLINE_ONLY === "true";
+
 const MODE_KEY = "owners.mode";
 export function loadMode(): GameMode | null {
   try {
     const m = localStorage.getItem(MODE_KEY);
+    if (OFFLINE_ONLY) return m === "offline" ? m : null;
     return m === "offline" || m === "online" ? m : null;
   } catch {
     return null;
