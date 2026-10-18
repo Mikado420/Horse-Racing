@@ -487,3 +487,18 @@ test("自動プレイで3年進めても破綻せず、数値まで判明した�
   assert.ok(numeric >= 10, `数値まで判明した能力 ${numeric}`);
   assert.ok(close / numeric >= 0.85, `真の値に近い割合 ${close}/${numeric}`);
 });
+
+/* ---------------- UI改修の前後でレース計算が変わらないこと ---------------- */
+import { generateCpuEntries as _cpu, hash32 as _hash } from "../src/index";
+
+test("レース計算の結果が UI 再設計（v2.0）前と完全に一致する", () => {
+  let acc = "";
+  for (const w of [60, 75, 90]) for (const p of raceCard(w)) {
+    const cpus = _cpu(p, 8, w * 7);
+    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 13);
+    acc += JSON.stringify(sim.results) + JSON.stringify(sim.frames[sim.frames.length - 1]);
+  }
+  // v2.0 着手前（コミット a2b7516）で計算した値
+  assert.equal(_hash(acc), 2309594831);
+  assert.equal(acc.length, 13033);
+});
