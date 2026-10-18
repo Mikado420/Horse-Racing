@@ -1,290 +1,284 @@
-// 出走：今週の番組から選び、調教師の意見を聞いて作戦を決め、レースを観戦する
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+// 出走計画：今週の候補レース・調教師の意見・この条件の見立て・リスクと期待・作戦 → 確認して出走
+import { useEffect, useMemo, useState } from "react";
 import {
-  CLASS_DEFS,
   GOING_LABELS,
   PACE_LABELS,
   SPURT_LABELS,
   STYLE_KEYS,
   STYLE_LABELS,
   SURFACE_LABELS,
-  activeHorses,
-  entryProblem,
-  ownerPrizeFor,
-  thisWeekCard,
-  trainerOpinion,
-  weekLabel,
-  LOCAL_OWNER_ID,
-  type OwnerProgram,
-  type OwnerRaceOutcome,
+  shortWeekLabel,
   type PacePlan,
-  type RaceStartMsg,
-  type ResultRow,
   type SpurtPlan,
   type Tactics,
 } from "@owners/shared";
-import { Notice } from "../components";
-import { yen } from "../format";
-import { RaceView } from "../screens/RaceView";
-import type { OwnerGame } from "../offline/useOwnerGame";
-import type { OScreen } from "./OwnerApp";
-import { StanceChip, StateBlock, trainerName } from "./ui";
+import { ScreenHead } from "./AppShell";
+import { useOwner, type Route } from "./context";
+import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedback";
+import { Icon } from "./icons";
+import { ActionBar, HorseConditionBadge, StanceTag, StateMeters, trainerName, yen } from "./ui";
+import { classLabel, entryOptions, stakesAhead, type EntryVM } from "./vm";
 
-const REPLAY_SPEED = 2;
-const COUNTDOWN_MS = 3000;
+type RaceRoute = Extract<Route, { tab: "race" }>;
 
-interface Running {
-  race: RaceStartMsg;
-  results: ResultRow[];
-  resultAt: number;
-  outcome: OwnerRaceOutcome;
-}
+const STYLE_DESC: Record<string, string> = { front: "先頭に立って逃げる", stalker: "前の方で運ぶ", closer: "中団から直線で差す", deep: "後方から一気に追い込む" };
+const PACE_DESC: Record<PacePlan, string> = { easy: "道中は抑えて脚をためる", normal: "流れに合わせる", aggressive: "前へ攻める（消耗しやすい）" };
+const SPURT_DESC: Record<SpurtPlan, string> = { early: "最終コーナーの手前から動く", normal: "最終コーナーで動く", late: "直線に入ってから動く" };
 
-export function RaceEntry({ game, initialHorseId, go }: { game: OwnerGame; initialHorseId?: string; go: (s: OScreen) => void }) {
-  const save = game.save!;
-  const horses = activeHorses(save);
-  const card = thisWeekCard(save);
-  const [horseId, setHorseId] = useState(() => initialHorseId ?? horses.find((h) => card.some((p) => !entryProblem(save, h, p)))?.id ?? horses[0]?.id ?? "");
-  const horse = horses.find((h) => h.id === horseId);
-  const [programId, setProgramId] = useState<string | null>(null);
+export function RaceEntry({ route }: { route: RaceRoute }) {
+  const { vm, save, nav, startRace } = useOwner();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { busy, run } = useBusy();
+  const defaultHorse = route.horseId ?? vm.horses.find((h) => h.runnable > 0)?.view.id ?? vm.horses[0]?.view.id;
+  const [horseId, setHorseId] = useState(defaultHorse);
+  const [programId, setProgramId] = useState<string | null>(route.programId ?? null);
   const [tactics, setTactics] = useState<Tactics | null>(null);
-  const [running, setRunning] = useState<Running | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const horse = vm.horses.find((h) => h.view.id === horseId);
+  const options = useMemo(() => (horseId ? entryOptions(save, horseId) : []), [save, horseId]);
+  const selected = options.find((o) => o.program.id === programId && !o.problem) ?? null;
+  const eligible = options.filter((o) => !o.problem);
 
-  const program = card.find((p) => p.id === programId);
-  const opinion = useMemo(() => (horse && program && !entryProblem(save, horse, program) ? trainerOpinion(save, horse.id, program.id) : null), [save, horse, program]);
   useEffect(() => {
-    if (opinion) setTactics(opinion.suggestedTactics);
-  }, [opinion]);
+    if (selected?.opinion) setTactics(selected.opinion.suggestedTactics);
+  }, [selected?.program.id, horseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const start = () => {
-    if (!horse || !program || !tactics) return;
-    if (opinion?.stance === "反対" && !window.confirm("調教師は今回の出走に反対しています。それでも出走させますか？（厩舎との関係が悪くなります）")) return;
-    setError(null);
-    try {
-      const out = game.runRace(horse.id, program.id, tactics);
-      const now = Date.now();
-      const startAt = now + COUNTDOWN_MS;
-      const results: ResultRow[] = out.record.field.map((f) => ({
-        position: f.position,
-        gate: f.gate,
-        horseId: f.isMine ? out.record.horseId : `cpu-${f.gate}`,
-        horseName: f.name,
-        playerId: f.isMine ? LOCAL_OWNER_ID : "cpu",
-        playerName: f.isMine ? save.player.username : "CPU厩舎",
-        timeMs: f.timeMs,
-        marginLengths: f.marginLengths,
-        prize: f.isMine ? out.record.prize : ownerPrizeFor(program, f.position),
-      }));
-      const lastFinish = Math.max(...results.map((r) => r.timeMs));
-      setRunning({
-        race: { ...out.replay, startAt, serverNow: now, replaySpeed: REPLAY_SPEED },
-        results,
-        resultAt: startAt + lastFinish / REPLAY_SPEED + 500,
-        outcome: out,
-      });
-      setShowResult(false);
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  const pick = (o: EntryVM) => {
+    setProgramId(o.program.id);
+    nav.replace({ tab: "race", horseId, programId: o.program.id });
+    if (!window.matchMedia("(min-width: 700px)").matches) setSheetOpen(true);
   };
 
-  if (running) {
-    const visible = showResult || Date.now() >= running.resultAt;
-    const rec = running.outcome.record;
-    return (
-      <ResultWatcher at={running.resultAt} revealed={visible} onReveal={() => setShowResult(true)}>
-        <RaceView
-          race={running.race}
-          now={Date.now}
-          results={visible ? running.results : null}
-          myId={LOCAL_OWNER_ID}
-          onSkip={() => {
-            setRunning({ ...running, race: { ...running.race, startAt: Date.now() - running.race.durationSec * 1000 } });
-            setShowResult(true);
-          }}
-          savedNote="賞金と戦績はこのブラウザに保存しました。"
-          backLabel="出走画面に戻る"
-          onBack={() => {
-            setRunning(null);
-            setProgramId(null);
-          }}
-          actions={
-            <div className="result-actions">
-              <p className="trainer-comment">{rec.trainerComment}</p>
-              {running.outcome.injured && <Notice kind="error">レース後に脚元の不安が見つかりました。治療が必要です。</Notice>}
-              <button className="btn btn-primary btn-wide" onClick={() => go({ name: "analysis", raceId: rec.raceId })}>
-                このレースを分析する
-              </button>
-              <button className="btn btn-quiet btn-wide" onClick={() => go({ name: "horse", horseId: rec.horseId })}>
-                馬の見立てを見る
-              </button>
+  const go = () =>
+    run(async () => {
+      if (!horse || !selected || !tactics) return;
+      const p = selected.program;
+      const ok = await confirm({
+        title: "出走の確認",
+        okLabel: "出走を確定する",
+        danger: selected.opinion?.stance === "反対",
+        body: (
+          <dl className="facts compact">
+            <div>
+              <dt>馬</dt>
+              <dd>{horse.view.name}</dd>
             </div>
-          }
-        />
-      </ResultWatcher>
+            <div>
+              <dt>レース</dt>
+              <dd>
+                {p.name}（{classLabel(p)}）
+              </dd>
+            </div>
+            <div>
+              <dt>コース</dt>
+              <dd>
+                {p.course.trackName} {SURFACE_LABELS[p.course.surface]}
+                {p.course.distance}m／馬場{GOING_LABELS[p.going]}
+              </dd>
+            </div>
+            <div>
+              <dt>作戦</dt>
+              <dd>
+                {STYLE_LABELS[tactics.style]}・ペース{PACE_LABELS[tactics.pace]}・仕掛け{SPURT_LABELS[tactics.spurt]}
+              </dd>
+            </div>
+            {selected.opinion?.stance === "反対" && (
+              <div>
+                <dt>注意</dt>
+                <dd className="warn-text">調教師は反対しています。厩舎との関係が悪くなります。</dd>
+              </div>
+            )}
+          </dl>
+        ),
+      });
+      if (!ok) return;
+      try {
+        startRace(horse.view.id, p.id, tactics);
+      } catch (e) {
+        toast((e as Error).message, "error");
+      }
+    });
+
+  if (vm.horses.length === 0) {
+    return (
+      <div className="screen">
+        <ScreenHead title="出走" />
+        <EmptyState icon="horse" title="現役の馬がいません" action={<button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>馬を買う</button>} />
+      </div>
     );
   }
 
+  const detail = selected && horse && tactics && <EntryDetail e={selected} tactics={tactics} setTactics={setTactics} trainer={trainerName(horse.view.trainerId)} />;
+
   return (
-    <div className="page">
-      <h1 className="page-title">出走</h1>
-      <p className="lead">
-        {weekLabel(save.week)}の番組です。出走させる馬とレースを選び、調教師の意見を聞いて作戦を決めてください。相手は CPU 厩舎の馬です。
-      </p>
-
-      {horses.length === 0 ? (
-        <p className="muted">現役の馬がいません。</p>
-      ) : (
-        <fieldset className="pick-horse pick-row">
-          <legend>出走させる馬</legend>
-          {horses.map((h) => {
-            const n = card.filter((p) => !entryProblem(save, h, p)).length;
-            return (
-              <label key={h.id} className={`pick ${horse?.id === h.id ? "is-picked" : ""}`}>
-                <input
-                  type="radio"
-                  name="horse"
-                  checked={horse?.id === h.id}
-                  onChange={() => {
-                    setHorseId(h.id);
-                    setProgramId(null);
-                  }}
-                />
-                <strong>{h.name}</strong>
-                <span className="muted">
-                  {h.record.races}戦{h.record.wins}勝 ・ {n > 0 ? `出られるレース ${n}` : "今週は出られません"}
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
-      {horse && <StateBlock s={horse.state} compact />}
-      {error && <Notice kind="error">{error}</Notice>}
-
-      <h2 className="section-title">今週の番組</h2>
-      <ul className="programs">
-        {card.map((p) => {
-          const problem = horse ? entryProblem(save, horse, p) : "馬を選んでください";
-          return (
-            <ProgramItem key={p.id} p={p} problem={problem} picked={programId === p.id} onPick={() => setProgramId(p.id)} />
-          );
-        })}
-      </ul>
-
-      {program && horse && opinion && tactics && (
-        <section className="entry-panel" aria-label="出走の確認">
-          <h2 className="section-title">
-            {program.name}に{horse.name}で出走
-          </h2>
-          <div className="opinion">
-            <p>
-              {trainerName(horse.trainerId)}調教師の意見：<StanceChip stance={opinion.stance} />
-            </p>
-            <ul>
-              {opinion.reasons.map((r, i) => (
-                <li key={i}>{r}</li>
+    <div className="screen">
+      <div className="head-tabs">
+      <ScreenHead nav={nav} title="出走計画" sub={`${shortWeekLabel(save.week)}の番組`} />
+      <div className="chip-row horse-chips" role="radiogroup" aria-label="出走させる馬">
+        {vm.horses.map((h) => (
+          <button
+            key={h.view.id}
+            role="radio"
+            aria-checked={h.view.id === horseId}
+            className="chip"
+            onClick={() => {
+              setHorseId(h.view.id);
+              setProgramId(null);
+              nav.replace({ tab: "race", horseId: h.view.id });
+            }}
+          >
+            {h.view.name}
+            <small>{h.runnable ? `出走可 ${h.runnable}` : "今週は不可"}</small>
+          </button>
+        ))}
+      </div>
+      </div>
+      <div className="split">
+        <div className="split-main scroll">
+          {horse && (
+            <div className="entry-horse">
+              <HorseConditionBadge c={horse.condition} />
+              <StateMeters s={horse.view.state} compact />
+            </div>
+          )}
+          {eligible.length === 0 && <EmptyState icon="race" title="今週出られるレースはありません">{options.find((o) => o.problem)?.problem}</EmptyState>}
+          <ul className="program-list">
+            {options.map((o) => (
+              <li key={o.program.id}>
+                <button className="program-row" disabled={!!o.problem} aria-pressed={o.program.id === programId} onClick={() => pick(o)}>
+                  <span className="program-row-main">
+                    <strong>{o.program.name}</strong>
+                    <span className="pill">{classLabel(o.program)}</span>
+                    {o.program.named && <span className="pill pill-gold">重賞</span>}
+                  </span>
+                  <span className="program-row-sub">
+                    {o.program.course.trackName} {SURFACE_LABELS[o.program.course.surface]}
+                    {o.program.course.distance}m／馬場{GOING_LABELS[o.program.going]}／1着 {yen(o.program.firstPrize)}
+                  </span>
+                  {o.problem ? <span className="program-row-problem">{o.problem}</span> : o.opinion && <StanceTag stance={o.opinion.stance} />}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <details className="stakes-ahead">
+            <summary>今後の重賞（開催時期）</summary>
+            <ul className="plain-list">
+              {stakesAhead(save).map(({ program: p, weeksAway }) => (
+                <li key={p.id}>
+                  {shortWeekLabel(p.week)}（あと{weeksAway}週） <strong>{p.name}</strong> {SURFACE_LABELS[p.course.surface]}
+                  {p.course.distance}m・{p.conditionText}
+                </li>
               ))}
             </ul>
-          </div>
-          <div className="tactics">
-            <TacticRow
-              label="脚質"
-              value={tactics.style}
-              options={STYLE_KEYS.map((s) => [s, STYLE_LABELS[s]])}
-              onChange={(style) => setTactics({ ...tactics, style })}
-            />
-            <TacticRow
-              label="ペース"
-              value={tactics.pace}
-              options={(Object.keys(PACE_LABELS) as PacePlan[]).map((s) => [s, PACE_LABELS[s]])}
-              onChange={(pace) => setTactics({ ...tactics, pace })}
-            />
-            <TacticRow
-              label="仕掛け"
-              value={tactics.spurt}
-              options={(Object.keys(SPURT_LABELS) as SpurtPlan[]).map((s) => [s, SPURT_LABELS[s]])}
-              onChange={(spurt) => setTactics({ ...tactics, spurt })}
-            />
-            <p className="hint">作戦は騎手への指示です。馬の気性や展開、スタミナによって、実際の動きは変わることがあります。</p>
-          </div>
-          <button className="btn btn-primary btn-wide" onClick={start}>
-            出走する
-          </button>
-        </section>
+          </details>
+        </div>
+        <aside className="split-side scroll entry-side" aria-label="出走の検討">
+          {detail ?? <EmptyState icon="race" title="レースを選んでください">調教師の意見と、この条件についての見立てが表示されます。</EmptyState>}
+        </aside>
+      </div>
+      <ActionBar info={selected ? <span>{selected.program.name}</span> : <span className="muted">レースを選ぶと出走できます</span>}>
+        <button className="btn btn-primary" disabled={!selected || !tactics || busy} onClick={go}>
+          <Icon name="race" />
+          出走を確定する
+        </button>
+      </ActionBar>
+      {sheetOpen && detail && (
+        <BottomSheet
+          title={selected!.program.name}
+          onClose={() => setSheetOpen(false)}
+          actions={
+            <button className="btn btn-primary" disabled={busy} onClick={() => (setSheetOpen(false), go())}>
+              出走を確定する
+            </button>
+          }
+        >
+          {detail}
+        </BottomSheet>
       )}
     </div>
   );
 }
 
-function ProgramItem({ p, problem, picked, onPick }: { p: OwnerProgram; problem: string | null; picked: boolean; onPick: () => void }) {
+function EntryDetail({ e, tactics, setTactics, trainer }: { e: EntryVM; tactics: Tactics; setTactics: (t: Tactics) => void; trainer: string }) {
+  const p = e.program;
   const c = p.course;
   return (
-    <li className={`program ${p.named ? "tier-4" : ""} ${picked ? "is-picked" : ""}`}>
-      <div className="program-name">
-        <strong>{p.name}</strong>
-        <span className="tag">{CLASS_DEFS[p.classId].label}</span>
-      </div>
-      <dl className="program-facts">
+    <div className="entry-detail">
+      <p className="entry-course">
+        {c.trackName}競馬場 {SURFACE_LABELS[c.surface]}
+        {c.distance}m／{c.direction === "right" ? "右回り" : "左回り"}
+        {c.slope ? "・坂あり" : ""}
+        {c.tight ? "・小回り" : ""}／馬場{GOING_LABELS[p.going]}／{p.conditionText}
+      </p>
+      {e.opinion && (
+        <section className="opinion2">
+          <h3>
+            {trainer}調教師の意見 <StanceTag stance={e.opinion.stance} />
+          </h3>
+          <ul>
+            {e.opinion.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section>
+        <h3>この条件の見立て</h3>
+        <ul className="fit-list">
+          {e.fit.map((f) => (
+            <li key={f.key} className={f.unverified ? "is-unverified" : ""}>
+              <span>{f.label.replace(/（.*）/, "")}</span>
+              <strong>{f.unverified ? "未検証" : f.stage === "abstract" ? "判断材料不足" : f.mark}</strong>
+              <small>{f.comment}</small>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="risk-exp">
         <div>
-          <dt>コース</dt>
-          <dd>
-            {c.trackName} {SURFACE_LABELS[c.surface]}
-            {c.distance}m
-          </dd>
+          <h3>
+            <Icon name="alert" size={15} />
+            リスク
+          </h3>
+          <ul>{e.risks.length ? e.risks.map((r, i) => <li key={i}>{r}</li>) : <li>大きな不安はありません</li>}</ul>
         </div>
         <div>
-          <dt>特徴</dt>
-          <dd>
-            {c.direction === "right" ? "右回り" : "左回り"}
-            {c.slope ? "・坂" : ""}
-            {c.tight ? "・小回り" : ""}
-          </dd>
+          <h3>
+            <Icon name="spark" size={15} />
+            期待
+          </h3>
+          <ul>
+            {e.expectations.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
         </div>
-        <div>
-          <dt>馬場</dt>
-          <dd>{GOING_LABELS[p.going]}</dd>
-        </div>
-        <div>
-          <dt>条件</dt>
-          <dd>{p.conditionText}</dd>
-        </div>
-        <div>
-          <dt>1着賞金</dt>
-          <dd>{yen(p.firstPrize)}</dd>
-        </div>
-      </dl>
-      <button className={`btn ${picked ? "btn-primary" : ""}`} disabled={!!problem} onClick={onPick}>
-        {picked ? "選択中" : "このレースを検討"}
-      </button>
-      {problem && <p className="hint">{problem}</p>}
-    </li>
+      </section>
+      <section className="tactics2">
+        <h3>作戦</h3>
+        <p className="hint2">作戦は騎手への優先方針です。馬の気性や展開、スタミナによって実際の動きは変わります。</p>
+        <TacticRow label="脚質" value={tactics.style} options={STYLE_KEYS.map((s) => [s, STYLE_LABELS[s], STYLE_DESC[s]])} onChange={(style) => setTactics({ ...tactics, style })} />
+        <TacticRow label="ペース" value={tactics.pace} options={(Object.keys(PACE_LABELS) as PacePlan[]).map((s) => [s, PACE_LABELS[s], PACE_DESC[s]])} onChange={(pace) => setTactics({ ...tactics, pace })} />
+        <TacticRow label="仕掛け" value={tactics.spurt} options={(Object.keys(SPURT_LABELS) as SpurtPlan[]).map((s) => [s, SPURT_LABELS[s], SPURT_DESC[s]])} onChange={(spurt) => setTactics({ ...tactics, spurt })} />
+      </section>
+    </div>
   );
 }
 
-function TacticRow<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
+function TacticRow<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string, string][]; onChange: (v: T) => void }) {
+  const cur = options.find((o) => o[0] === value);
   return (
-    <div className="tactic-row">
-      <span className="tactic-label">{label}</span>
-      <div className="seg" role="group" aria-label={label}>
+    <div className="tactic2">
+      <span className="setting-label">{label}</span>
+      <div className="seg2" role="radiogroup" aria-label={label}>
         {options.map(([v, l]) => (
-          <button key={v} aria-pressed={value === v} onClick={() => onChange(v)}>
+          <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)}>
             {l}
           </button>
         ))}
       </div>
+      <span className="hint2">{cur?.[2]}</span>
     </div>
   );
-}
-
-/** 再生がゴールに達した時刻に結果を表示する */
-function ResultWatcher({ at, revealed, onReveal, children }: { at: number; revealed: boolean; onReveal: () => void; children: ReactNode }) {
-  useEffect(() => {
-    if (revealed) return;
-    const id = setTimeout(onReveal, Math.max(0, at - Date.now()));
-    return () => clearTimeout(id);
-  }, [at, revealed, onReveal]);
-  return <>{children}</>;
 }

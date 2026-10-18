@@ -21,7 +21,7 @@ export interface OwnerGame {
   dismissNotice(): void;
   newGame(ownerName: string): void;
   chooseStarter(offerId: string, trainerId: string, name: string | null): void;
-  advance(weeks: number): { reports: G.WeeklyReport[]; notices: string[] };
+  advance(weeks: number): { reports: G.WeeklyReport[]; notices: string[]; save: G.OwnerSave };
   setPolicy(horseId: string, patch: Partial<G.HorsePolicy>): void;
   transfer(horseId: string, trainerId: string): void;
   runRace(horseId: string, programId: string, tactics: G.Tactics): G.OwnerRaceOutcome;
@@ -88,7 +88,7 @@ export function useOwnerGame(): OwnerGame {
         if (i < weeks - 1 && r.reports.some((x) => x.alerts.some((a) => /痛め|故障/.test(a)))) break;
       }
       commit(s);
-      return { reports, notices };
+      return { reports, notices, save: s };
     },
     setPolicy: (id, patch) => commit(G.setPolicy(current(), id, patch)),
     transfer: (id, trainerId) => commit(G.transferHorse(current(), id, trainerId)),

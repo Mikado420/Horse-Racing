@@ -1,133 +1,233 @@
-// オフライン版（馬主モード）の画面全体
-import { useState, type ReactNode } from "react";
-import { weekLabel } from "@owners/shared";
-import { Notice } from "../components";
-import { yen } from "../format";
+// オフライン版（馬主モード）の画面全体：画面遷移・共通の通知と確認・レース観戦への切り替え
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { OwnerRaceOutcome, Tactics } from "@owners/shared";
 import { NewGameScreen } from "../offline/NewGameScreen";
-import { SaveDataPanel } from "../offline/SaveDataPanel";
 import type { OwnerGame } from "../offline/useOwnerGame";
+import { AppShell } from "./AppShell";
+import { OwnerCtx, tabOf, type Nav, type NavTab, type OwnerCtxValue, type Route } from "./context";
+import { BottomSheet, FeedbackProvider, type ToastKind } from "./feedback";
+import { playSound, type SoundId } from "./sound";
+import { useUiState } from "./uiState";
+import { buildVM, todos } from "./vm";
 import { StarterPick } from "./StarterPick";
 import { OwnerHome } from "./OwnerHome";
-import { HorseDetail } from "./HorseDetail";
+import { HorsesScreen } from "./HorsesScreen";
+import { ShopScreen } from "./ShopScreen";
+import { StableScreen } from "./StableScreen";
 import { RaceEntry } from "./RaceEntry";
-import { AnalysisScreen } from "./AnalysisScreen";
-import { TrainersScreen } from "./TrainersScreen";
-import { ShopOwner } from "./ShopOwner";
-import { RecordsOwner } from "./RecordsOwner";
-import { LabOwner } from "./LabOwner";
+import { RecordsScreen } from "./RecordsScreen";
+import { RaceViewer } from "./RaceViewer";
+import { SettingsPanel } from "./SettingsPanel";
+import { TodoList } from "./OwnerHome";
 
-export type OScreen =
-  | { name: "home" }
-  | { name: "horse"; horseId: string; tab?: HorseTab }
-  | { name: "race"; horseId?: string }
-  | { name: "analysis"; raceId?: string; horseId?: string }
-  | { name: "trainers" }
-  | { name: "shop" }
-  | { name: "records" }
-  | { name: "lab" };
+const TAB_ROOT: Record<NavTab, Route> = {
+  home: { tab: "home" },
+  horses: { tab: "horses" },
+  stable: { tab: "stable", sub: "reports" },
+  race: { tab: "race" },
+  records: { tab: "records", sub: "races" },
+};
 
-export type HorseTab = "eval" | "policy" | "races" | "history" | "manage";
+export interface RunningRace {
+  outcome: OwnerRaceOutcome;
+  discoveries: string[];
+}
 
-const NAV: [OScreen["name"], string][] = [
-  ["home", "馬主"],
-  ["race", "出走"],
-  ["analysis", "分析"],
-  ["trainers", "厩舎"],
-  ["shop", "馬を買う"],
-  ["records", "記録"],
-  ["lab", "検証"],
-];
+/** 画面遷移。戻る操作（画面内の戻る・端末の戻る）で前の画面と選択状態に戻る */
+function useNavStack(): Nav {
+  const [stack, setStack] = useState<Route[]>([{ tab: "home" }]);
+  const ref = useRef(stack);
+  ref.current = stack;
+  useEffect(() => {
+    const onPop = () => {
+      if (ref.current.length > 1) setStack((s) => s.slice(0, -1));
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  return useMemo<Nav>(
+    () => ({
+      route: stack[stack.length - 1],
+      canBack: stack.length > 1,
+      push: (r) => {
+        try {
+          history.pushState({ owners: true }, "");
+        } catch {
+          /* 履歴が使えなくても画面内の戻るは動く */
+        }
+        setStack((s) => [...s, r]);
+      },
+      replace: (r) => setStack((s) => [...s.slice(0, -1), r]),
+      switchTab: (t) => setStack([TAB_ROOT[t]]),
+      back: () => {
+        if (ref.current.length <= 1) return;
+        try {
+          history.back();
+        } catch {
+          setStack((s) => s.slice(0, -1));
+        }
+      },
+    }),
+    [stack],
+  );
+}
 
 export function OwnerApp({ game, onSwitchMode }: { game: OwnerGame; onSwitchMode: () => void }) {
-  const [screen, setScreen] = useState<OScreen>({ name: "home" });
-  const save = game.save;
+  const { ui, update } = useUiState();
+  const settings = ui.settings;
+  const sound = useCallback((id: SoundId) => settings.sound && playSound(id), [settings.sound]);
+  const onToastSound = useCallback((k: ToastKind) => (k === "gold" ? sound("win") : k === "good" ? sound("report") : undefined), [sound]);
 
-  if (!save) {
+  useEffect(() => {
+    document.documentElement.classList.toggle("fx-reduced", settings.effects === "reduced");
+  }, [settings.effects]);
+
+  return (
+    <FeedbackProvider onSound={onToastSound}>
+      <OwnerInner game={game} onSwitchMode={onSwitchMode} ui={ui} update={update} sound={sound} />
+    </FeedbackProvider>
+  );
+}
+
+function OwnerInner({
+  game,
+  onSwitchMode,
+  ui,
+  update,
+  sound,
+}: {
+  game: OwnerGame;
+  onSwitchMode: () => void;
+  ui: ReturnType<typeof useUiState>["ui"];
+  update: ReturnType<typeof useUiState>["update"];
+  sound: (id: SoundId) => void;
+}) {
+  const nav = useNavStack();
+  const [sheet, setSheet] = useState<"notices" | "settings" | null>(null);
+  const [running, setRunning] = useState<RunningRace | null>(null);
+  const save = game.save;
+  const saveKey = save?.createdAt ?? "";
+  const read = useMemo(() => new Set(ui.readReports[saveKey] ?? []), [ui.readReports, saveKey]);
+  const vm = useMemo(() => (save ? buildVM(save, read) : null), [save, read]);
+
+  const markRead = useCallback(
+    (ids: string[]) =>
+      update((u) => {
+        const cur = new Set(u.readReports[saveKey] ?? []);
+        let changed = false;
+        for (const id of ids) if (!cur.has(id)) (cur.add(id), (changed = true));
+        return changed ? { ...u, readReports: { ...u.readReports, [saveKey]: [...cur] } } : u;
+      }),
+    [update, saveKey],
+  );
+
+  const startRace = useCallback(
+    (horseId: string, programId: string, tactics: Tactics) => {
+      const before = new Set(game.save!.horses.find((h) => h.id === horseId)!.knowledge.events);
+      const outcome = game.runRace(horseId, programId, tactics);
+      const after = outcome.save.horses.find((h) => h.id === horseId)!.knowledge.events;
+      const discoveries = after.filter((e) => !before.has(e)).map((e) => e.text);
+      update((u) => ({ ...u, opinions: { ...u.opinions, [outcome.record.raceId]: { stance: outcome.opinion.stance, reasons: outcome.opinion.reasons } } }));
+      sound("start");
+      setRunning({ outcome, discoveries });
+      return outcome;
+    },
+    [game, update, sound],
+  );
+
+  if (!save || !vm) {
     return (
       <NewGameScreen
         loadError={game.loadError}
         onStart={(n) => {
           game.newGame(n);
-          setScreen({ name: "home" });
+          nav.switchTab("home");
         }}
         onImport={(t) => game.importText(t)}
         onBack={onSwitchMode}
       />
     );
   }
-  if (save.starterOffers) return <StarterPick game={game} onDone={() => setScreen({ name: "home" })} />;
+  if (save.starterOffers) return <StarterPick game={game} />;
 
-  const go = (s: OScreen) => {
-    setScreen(s);
-    window.scrollTo?.(0, 0);
+  const ctx: OwnerCtxValue = {
+    game,
+    save,
+    vm,
+    nav,
+    ui,
+    setSettings: (p) => update((u) => ({ ...u, settings: { ...u.settings, ...p } })),
+    markRead,
+    startRace,
+    sound,
+    openSettings: () => setSheet("settings"),
   };
 
+  if (running) {
+    return (
+      <OwnerCtx.Provider value={ctx}>
+        <RaceViewer
+          running={running}
+          onExit={(to) => {
+            setRunning(null);
+            if (to === "analysis") nav.switchTab("records"), nav.push({ tab: "records", sub: "analysis", raceId: running.outcome.record.raceId });
+            else if (to === "horse") nav.switchTab("horses"), nav.push({ tab: "horses", horseId: running.outcome.record.horseId, detail: true, horseTab: "ability" });
+            else nav.switchTab(to === "home" ? "home" : "race");
+          }}
+        />
+      </OwnerCtx.Provider>
+    );
+  }
+
+  const items = todos(save, vm);
+  const r = nav.route;
+  const unread = vm.reports.filter((x) => x.unread).length;
   return (
-    <OwnerShell screen={screen} go={go} owner={save.player.username} money={save.player.money} week={save.week}>
-      {game.notice && (
-        <div className="page page-notice">
-          <Notice kind="good">
-            {game.notice}{" "}
-            <button className="link" onClick={game.dismissNotice}>
-              閉じる
-            </button>
-          </Notice>
-        </div>
+    <OwnerCtx.Provider value={ctx}>
+      <AppShell
+        nav={nav}
+        status={{
+          week: save.week,
+          money: save.player.money,
+          owner: save.player.username,
+          notices: items.filter((t) => t.importance !== "normal").length,
+          urgent: items.some((t) => t.importance === "urgent"),
+          savedAt: save.updatedAt,
+          saveError: !!game.storageError,
+        }}
+        onNotices={() => setSheet("notices")}
+        onSettings={() => setSheet("settings")}
+        badges={{ stable: unread }}
+      >
+        {r.tab === "home" && <OwnerHome key="home" />}
+        {r.tab === "horses" && <HorsesScreen key={`horses-${r.detail ? r.horseId : "list"}`} route={r} />}
+        {r.tab === "shop" && <ShopScreen />}
+        {r.tab === "stable" && <StableScreen route={r} />}
+        {r.tab === "race" && <RaceEntry key={`race-${r.horseId ?? ""}`} route={r} />}
+        {r.tab === "records" && <RecordsScreen route={r} />}
+      </AppShell>
+      {sheet === "notices" && (
+        <BottomSheet title="お知らせ" onClose={() => setSheet(null)}>
+          <TodoList items={items} onAct={() => setSheet(null)} />
+        </BottomSheet>
       )}
-      {game.storageError && (
-        <div className="page page-notice">
-          <Notice kind="error">{game.storageError}</Notice>
-        </div>
+      {sheet === "settings" && (
+        <BottomSheet title="設定" onClose={() => setSheet(null)}>
+          <SettingsPanel onSwitchMode={onSwitchMode} />
+        </BottomSheet>
       )}
-      {screen.name === "home" && <OwnerHome game={game} go={go} footer={<SaveDataPanel game={game} onSwitchMode={onSwitchMode} />} />}
-      {screen.name === "horse" && <HorseDetail key={screen.horseId} game={game} horseId={screen.horseId} tab={screen.tab ?? "eval"} go={go} />}
-      {screen.name === "race" && <RaceEntry game={game} initialHorseId={screen.horseId} go={go} />}
-      {screen.name === "analysis" && <AnalysisScreen game={game} raceId={screen.raceId} horseId={screen.horseId} go={go} />}
-      {screen.name === "trainers" && <TrainersScreen game={game} go={go} />}
-      {screen.name === "shop" && <ShopOwner game={game} go={go} />}
-      {screen.name === "records" && <RecordsOwner game={game} go={go} />}
-      {screen.name === "lab" && <LabOwner />}
-    </OwnerShell>
+      {game.notice && <NoticeToast text={game.notice} onDone={game.dismissNotice} />}
+    </OwnerCtx.Provider>
   );
 }
 
-function OwnerShell({
-  screen,
-  go,
-  owner,
-  money,
-  week,
-  children,
-}: {
-  screen: OScreen;
-  go: (s: OScreen) => void;
-  owner: string;
-  money: number;
-  week: number;
-  children: ReactNode;
-}) {
+/** 起動時のお知らせ（旧形式からの引き継ぎなど）。一度だけ表示 */
+function NoticeToast({ text, onDone }: { text: string; onDone: () => void }) {
   return (
-    <div className={`app ${screen.name === "race" ? "app-race" : ""}`}>
-      <header className="topbar">
-        <button className="brand" onClick={() => go({ name: "home" })}>
-          競走馬オーナーズ
-          <span className="mode-badge mode-offline">馬主</span>
-        </button>
-        <nav className="topnav" aria-label="メインメニュー">
-          {NAV.map(([name, label]) => (
-            <button key={name} aria-current={screen.name === name} onClick={() => go({ name } as OScreen)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="purse" title="所持金">
-          <span className="purse-owner">
-            {owner} ・ {weekLabel(week)}
-          </span>
-          <strong className={money < 0 ? "minus" : ""}>{yen(money)}</strong>
-        </div>
-      </header>
-      <main className="main">{children}</main>
-    </div>
+    <BottomSheet title="お知らせ" onClose={onDone} actions={<button className="btn btn-primary" onClick={onDone}>閉じる</button>}>
+      <p>{text}</p>
+    </BottomSheet>
   );
 }
+
+export { tabOf };

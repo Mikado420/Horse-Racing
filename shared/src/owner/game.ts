@@ -576,7 +576,10 @@ function trainerRaceComment(r: OwnerRaceRecord, t: Trainer, opinion: TrainerOpin
   const parts: string[] = [];
   if (r.position === 1) parts.push("よく頑張ってくれました");
   else if (r.position <= 3) parts.push("上位争いができたのは収穫です");
-  else parts.push(`${marginLabel(Math.max(0, r.marginToWinner))}差の${r.position}着でした`);
+  else {
+    const m = marginLabel(Math.max(0, r.marginToWinner));
+    parts.push(`${m.endsWith("差") ? m : `${m}差`}の${r.position}着でした`);
+  }
   if (tel.blockedSec >= 3) parts.push("直線で前が詰まる不利がありました");
   if (tel.emptyRemain !== null) parts.push(`残り${tel.emptyRemain}mあたりで脚が上がっています`);
   if (tel.keenSec >= 4) parts.push("道中で行きたがって力みました");

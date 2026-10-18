@@ -1,6 +1,6 @@
 // 3D競馬場とレース再生（仮モデル）。サーバーから届いたフレームを時刻に合わせて補間して動かすだけで、
 // 着順の計算は一切しない。
-import { forwardRef, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DEFAULT_COURSE, distancesAt, trackPoint, type CourseDef, type RaceStartMsg } from "@owners/shared";
@@ -13,11 +13,20 @@ interface Props {
   serverNow: () => number;
   camera: CameraMode;
   highlight: number;
+  /** 描画品質（low は影なし・等倍解像度で軽くする） */
+  quality?: "high" | "low";
 }
 
-export function RaceScene({ race, serverNow, camera, highlight }: Props) {
+export function RaceScene({ race, serverNow, camera, highlight, quality = "high" }: Props) {
+  // Canvas は親要素の大きさに追従し、回転・サイズ変更時に描画サイズとカメラの縦横比を更新する
   return (
-    <Canvas className="race-canvas" shadows dpr={[1, 2]} camera={{ fov: 45, near: 0.5, far: 2000, position: [0, 80, 260] }}>
+    <Canvas
+      className="race-canvas"
+      shadows={quality === "high"}
+      dpr={quality === "high" ? [1, 2] : 1}
+      camera={{ fov: 45, near: 0.5, far: 2000, position: [0, 80, 260] }}
+      resize={{ debounce: 120 }}
+    >
       <color attach="background" args={["#BFD9E8"]} />
       <fog attach="fog" args={["#BFD9E8", 300, 900]} />
       <hemisphereLight args={["#EAF4FF", "#4C6B3A", 0.9]} />
@@ -33,8 +42,24 @@ export function RaceScene({ race, serverNow, camera, highlight }: Props) {
       />
       <Course course={race.course ?? DEFAULT_COURSE} />
       <Runners race={race} serverNow={serverNow} camera={camera} highlight={highlight} />
+      <AspectSync />
     </Canvas>
   );
+}
+
+/** 回転などで表示領域が変わったとき、カメラの縦横比を確実に更新する */
+function AspectSync() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    if (cam.isPerspectiveCamera && size.height > 0) {
+      cam.aspect = size.width / size.height;
+      // 縦長の画面ではコースが切れないよう少し広角にする
+      cam.fov = size.width < size.height ? 60 : 45;
+      cam.updateProjectionMatrix();
+    }
+  }, [camera, size.width, size.height]);
+  return null;
 }
 
 /** コース：芝の帯・内外ラチ・ゴール板・残り距離標識・スタンド */

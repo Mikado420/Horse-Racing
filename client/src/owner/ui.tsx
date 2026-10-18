@@ -1,41 +1,127 @@
-// 馬主モードの共通部品
+// 馬主モードの共通表示部品。受け取るのは表示用データ（HorseView・ReportVM など）だけ。
 import type { ReactNode } from "react";
 import {
+  ABILITY_KEYS,
   CONDITION_LABELS,
   findTrainer,
+  shortWeekLabel,
   type DisplayStage,
   type HorseState,
+  type HorseView,
   type KnowledgeView,
   type Stance,
   type TraitView,
 } from "@owners/shared";
-import { Gauge } from "../components";
+import { Icon, type IconName } from "./icons";
+import { IMPORTANCE_LABELS, REPORT_KIND_LABELS, type HorseCardVM, type Importance, type ReportVM } from "./vm";
 
-export const STAGE_LABELS: Record<DisplayStage, string> = { abstract: "見立て", rank: "ランク", numeric: "数値" };
+export const STAGE_LABELS: Record<DisplayStage, string> = { abstract: "見立て", rank: "ランク判明", numeric: "数値判明" };
+
+export const yen = (n: number) => `${n.toLocaleString("ja-JP")}円`;
+export const yenSigned = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n).toLocaleString("ja-JP")}円`;
 
 export function trainerName(id: string): string {
   return findTrainer(id)?.name ?? "（不明）";
 }
 
-/** 能力1項目の見え方（抽象表現 → 評価ランク → 数値） */
-export function AbilityRow({ v }: { v: KnowledgeView }) {
+const IMP_ICON: Record<Importance, IconName> = { urgent: "alert", check: "bell", normal: "info" };
+
+/** 重要度（色＋アイコン＋文字） */
+export function ImportanceTag({ level, label }: { level: Importance; label?: string }) {
   return (
-    <div className={`kn-row stage-${v.stage}`}>
-      <span className="kn-label">{v.label}</span>
-      <span className="kn-value" aria-label={`${v.label}：${v.value ?? v.rank ?? "未判明"}`}>
-        {v.stage === "numeric" ? (
-          <>
-            <strong className={`rank-chip rank-${v.rank}`}>{v.rank}</strong>
-            <strong className="kn-num">{v.value}</strong>
-          </>
-        ) : v.stage === "rank" ? (
-          <strong className={`rank-chip rank-${v.rank}`}>{v.rank}</strong>
-        ) : (
-          <span className="kn-unknown">？</span>
+    <span className={`imp imp-${level}`}>
+      <Icon name={IMP_ICON[level]} size={14} />
+      {label ?? IMPORTANCE_LABELS[level]}
+    </span>
+  );
+}
+
+/** HorseConditionBadge：体調・疲労をひとことで */
+export function HorseConditionBadge({ c }: { c: HorseCardVM["condition"] }) {
+  return <ImportanceTag level={c.level} label={c.label} />;
+}
+
+/** 疲労・仕上がり・健康・調子 */
+export function StateMeters({ s, compact }: { s: HorseState; compact?: boolean }) {
+  const meter = (label: string, v: number, warnAt: number, dangerAt: number, inverse = false) => {
+    const lvl = inverse ? (v >= dangerAt ? "bad" : v >= warnAt ? "warn" : "ok") : v < dangerAt ? "bad" : v < warnAt ? "warn" : "ok";
+    return (
+      <div className={`meter meter-${lvl}`}>
+        <span className="meter-label">{label}</span>
+        <span className="meter-track" aria-hidden>
+          <span style={{ width: `${v}%` }} />
+        </span>
+        <span className="meter-value">{v}</span>
+      </div>
+    );
+  };
+  return (
+    <div className={`meters ${compact ? "is-compact" : ""}`}>
+      {meter("疲労", s.fatigue, 45, 70, true)}
+      {meter("仕上がり", s.fitness, 60, 35)}
+      {meter("健康", s.health, 60, 40)}
+      <div className={`meter meter-mood mood-${s.condition}`}>
+        <span className="meter-label">調子</span>
+        <strong>{CONDITION_LABELS[String(s.condition)]}</strong>
+      </div>
+    </div>
+  );
+}
+
+/** HorseSummaryCard：所有馬の要点 */
+export function HorseSummaryCard({ h, selected, onOpen }: { h: HorseCardVM; selected?: boolean; onOpen: () => void }) {
+  const v = h.view;
+  return (
+    <button className={`horse-card ${selected ? "is-selected" : ""}`} onClick={onOpen} aria-pressed={selected}>
+      <span className="horse-card-top">
+        <span className="horse-name">{v.name}</span>
+        <span className="pill">{v.age}歳</span>
+        {h.unreadReports > 0 && (
+          <span className="pill pill-new">
+            <Icon name="report" size={13} />
+            報告 {h.unreadReports}
+          </span>
         )}
       </span>
-      <span className="kn-comment">{v.comment}</span>
+      <span className="horse-card-sub">{h.trainerName}厩舎</span>
+      <HorseConditionBadge c={h.condition} />
+      <span className="horse-card-plan">
+        <Icon name="clock" size={14} />
+        {h.nextPlan}
+      </span>
+      <span className="horse-card-progress" aria-label={`能力調査 ${h.known}/6 判明、解明度 ${h.progress}%`}>
+        <span className="progress-track" aria-hidden>
+          <span style={{ width: `${h.progress}%` }} />
+        </span>
+        <span>能力調査 {h.known}/6</span>
+      </span>
+    </button>
+  );
+}
+
+/** 能力1行：段階（見立て・ランク・数値）と推定の確かさを分けて表示する */
+export function AbilityRow({ v, fresh }: { v: KnowledgeView; fresh?: boolean }) {
+  return (
+    <div className={`ability stage-${v.stage} ${fresh ? "is-fresh" : ""}`}>
+      <span className="ability-label">{v.label}</span>
+      <span className="ability-value">
+        {v.stage === "abstract" ? (
+          <span className="rank-box is-unknown" aria-label="未判明">
+            ？
+          </span>
+        ) : (
+          <span className={`rank-box rank-${v.rank}`}>{v.rank}</span>
+        )}
+        {v.stage === "numeric" && <span className="ability-num">{v.value}</span>}
+      </span>
+      <span className="ability-comment">{v.comment}</span>
       <Certainty v={v} />
+      {fresh && (
+        <span className="ability-fresh">
+          <Icon name="spark" size={13} />
+          新たに判明
+        </span>
+      )}
     </div>
   );
 }
@@ -43,104 +129,118 @@ export function AbilityRow({ v }: { v: KnowledgeView }) {
 export function Certainty({ v }: { v: KnowledgeView }) {
   const level = v.certainty === "高い" ? 3 : v.certainty === "中程度" ? 2 : v.certainty === "低い" ? 1 : 0;
   return (
-    <span className="kn-cert" title={`評価の確かさ：${v.certainty}／解明度 ${v.knowledgeScore}%／証拠 ${v.evidenceCount}件`}>
-      <span className="kn-dots" aria-hidden>
+    <span className="cert" title={`解明度 ${v.knowledgeScore}%／証拠 ${v.evidenceCount}件`}>
+      <span className="cert-dots" aria-hidden>
         {[1, 2, 3].map((i) => (
           <i key={i} className={i <= level ? "on" : ""} />
         ))}
       </span>
-      <small>確かさ {v.certainty}</small>
-      <span className="kn-meter" aria-label={`解明度 ${v.knowledgeScore}%`}>
-        <span style={{ width: `${v.knowledgeScore}%` }} />
-      </span>
+      <span>確かさ：{v.certainty}</span>
     </span>
   );
 }
 
-/** 適性1項目（◎○△× または 未検証） */
-export function AptitudeCell({ v, short }: { v: KnowledgeView; short?: string }) {
-  const label = short ?? v.label;
+/** AbilityDiscoveryPanel：6能力 */
+export function AbilityDiscoveryPanel({ view, freshKeys }: { view: HorseView; freshKeys?: Set<string> }) {
   return (
-    <div className={`apt-cell ${v.unverified ? "is-unverified" : ""} stage-${v.stage}`} title={v.comment}>
-      <span className="apt-cell-label">{label}</span>
-      <strong className="apt-cell-mark">{v.mark ?? (v.unverified ? "未検証" : "？")}</strong>
-      <small className="apt-cell-note">
-        {v.unverified && v.mark ? "見込み・未検証" : v.stage === "numeric" ? `適性 ${v.value}` : v.unverified ? "実績なし" : `確かさ ${v.certainty}`}
-      </small>
+    <div className="ability-list">
+      {ABILITY_KEYS.map((k) => (
+        <AbilityRow key={k} v={view.knowledge[k]} fresh={freshKeys?.has(k)} />
+      ))}
+    </div>
+  );
+}
+
+/** 適性1項目 */
+export function AptitudeCell({ v, label }: { v: KnowledgeView; label: string }) {
+  const note = v.unverified ? (v.mark ? "見込み・未検証" : "未検証") : v.stage === "abstract" ? "判断材料不足" : `確かさ：${v.certainty}`;
+  return (
+    <div className={`aptc ${v.unverified ? "is-unverified" : ""}`} title={v.comment}>
+      <span className="aptc-label">{label}</span>
+      <strong className="aptc-mark">{v.mark ?? "−"}</strong>
+      <span className="aptc-note">{note}</span>
     </div>
   );
 }
 
 export function TraitChips({ traits }: { traits: TraitView[] }) {
-  if (traits.length === 0) return <p className="muted small">まだ個性ははっきりしていません。観察や実戦を重ねると見えてきます。</p>;
+  if (traits.length === 0) return <p className="muted">まだ個性ははっきりしていません。観察や実戦を重ねると見えてきます。</p>;
   return (
-    <ul className="trait-chips">
+    <ul className="traits">
       {traits.map((t) => (
         <li key={t.id} className={`trait trait-${t.status}`} title={t.desc}>
           <strong>{t.label}</strong>
-          <small>{t.status === "confirmed" ? "判明" : "兆候あり"}</small>
+          <span>{t.status === "confirmed" ? "判明" : "兆候あり"}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-export function StateBlock({ s, compact }: { s: HorseState; compact?: boolean }) {
+/** StableReportCard：要約を先に出し、タップで詳細 */
+export function StableReportCard({ r, onOpen, showHorse = true }: { r: ReportVM; onOpen: () => void; showHorse?: boolean }) {
   return (
-    <dl className={`state-block ${compact ? "is-compact" : ""}`}>
-      <div>
-        <dt>疲労</dt>
-        <dd>
-          <Gauge value={s.fatigue} danger={70} />
-          <span>{s.fatigue}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>仕上がり</dt>
-        <dd>
-          <span className="gauge gauge-ok" role="meter" aria-valuenow={s.fitness}>
-            <span style={{ width: `${s.fitness}%` }} />
-          </span>
-          <span>{s.fitness}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>健康</dt>
-        <dd>
-          <span className={`gauge ${s.health < 40 ? "gauge-danger" : s.health < 60 ? "gauge-warn" : "gauge-ok"}`} role="meter" aria-valuenow={s.health}>
-            <span style={{ width: `${s.health}%` }} />
-          </span>
-          <span>{s.health}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>調子</dt>
-        <dd className={`mood mood-${s.condition}`}>{CONDITION_LABELS[String(s.condition)]}</dd>
-      </div>
-      {s.injuryWeeks > 0 && (
-        <div className="state-injury">
-          <dt>故障</dt>
-          <dd>治療中（あと{s.injuryWeeks}週）</dd>
-        </div>
-      )}
-    </dl>
+    <button className={`report-card imp-border-${r.importance} ${r.unread ? "is-unread" : ""}`} onClick={onOpen}>
+      <span className="report-top">
+        <ImportanceTag level={r.importance} />
+        <span className="report-kind">{REPORT_KIND_LABELS[r.kind]}</span>
+        {r.needsReply && <span className="pill pill-reply">回答待ち</span>}
+        {r.unread && <span className="unread-dot" aria-label="未確認" />}
+      </span>
+      <span className="report-meta">
+        {showHorse && <strong>{r.report.horseName}</strong>}
+        <span>{shortWeekLabel(r.report.week)}</span>
+        <span>{trainerName(r.report.trainerId)}調教師</span>
+      </span>
+      <span className="report-summary">{r.summary}</span>
+    </button>
   );
 }
 
-export function StanceChip({ stance }: { stance: Stance }) {
-  return <span className={`stance stance-${stance}`}>{stance}</span>;
+export function StanceTag({ stance }: { stance: Stance }) {
+  const icon: Record<Stance, IconName> = { 推奨: "check", 賛成: "check", 慎重: "alert", 反対: "close" };
+  return (
+    <span className={`stance stance-${stance}`}>
+      <Icon name={icon[stance]} size={14} />
+      {stance}
+    </span>
+  );
 }
 
-export function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+/** ActionBar：画面下部の主要操作 */
+export function ActionBar({ children, info }: { children: ReactNode; info?: ReactNode }) {
   return (
-    <section className="o-section">
-      <div className="o-section-head">
-        <h2 className="section-title">{title}</h2>
-        {aside}
-      </div>
-      {children}
+    <div className="action-bar">
+      {info && <div className="action-info">{info}</div>}
+      <div className="action-buttons">{children}</div>
+    </div>
+  );
+}
+
+/** 画面内のペイン（中だけスクロールする） */
+export function Pane({ title, aside, children, className = "" }: { title?: string; aside?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={`pane ${className}`}>
+      {(title || aside) && (
+        <header className="pane-head">
+          {title && <h2>{title}</h2>}
+          {aside}
+        </header>
+      )}
+      <div className="pane-body">{children}</div>
     </section>
   );
 }
 
-export const yenSigned = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n).toLocaleString("ja-JP")}円`;
+/** タブ（あふれたらタブ列の中だけ横にスクロールする） */
+export function Tabs<T extends string>({ value, items, onChange, label }: { value: T; items: [T, string][]; onChange: (t: T) => void; label: string }) {
+  return (
+    <div className="tabs-row" role="tablist" aria-label={label}>
+      {items.map(([id, l]) => (
+        <button key={id} role="tab" aria-selected={value === id} onClick={() => onChange(id)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
