@@ -1,0 +1,16 @@
+
+> racing-owners@0.1.0 typecheck
+> npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client
+
+
+> @owners/shared@0.1.0 typecheck
+> tsc --noEmit -p .
+
+
+> @owners/server@0.1.0 typecheck
+> tsc --noEmit -p .
+
+
+> @owners/client@0.1.0 typecheck
+> tsc --noEmit -p .
+

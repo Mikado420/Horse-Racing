@@ -1,5 +1,5 @@
 branch: feature/pwa
-sha: 18b4d846d1ab4409c91b0c65f70312a5beb95d8d
+sha: f887b6c86a5077495e545e84ab1b6f693f9c405b
 test: success
 typecheck: success
 build: success

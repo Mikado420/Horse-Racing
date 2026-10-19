@@ -1,0 +1,27 @@
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 195 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/sound.ts is dynamically imported by /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/SettingsPanel.tsx but also statically imported by /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/OwnerApp.tsx, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mversion.json               [39m[1m[2m  0.06 kB[22m[1m[22m[2m │ gzip:   0.08 kB[22m
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  1.72 kB[22m[1m[22m[2m │ gzip:   0.82 kB[22m
+[2mdist/[22m[2massets/[22m[35mindex-OTWmL2nL.css  [39m[1m[2m 61.65 kB[22m[1m[22m[2m │ gzip:  12.88 kB[22m
+[2mdist/[22m[2massets/[22m[36mreact-DZAHxJIN.js   [39m[1m[2m133.93 kB[22m[1m[22m[2m │ gzip:  43.12 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-DcHuT4fi.js   [39m[1m[2m336.38 kB[22m[1m[22m[2m │ gzip: 120.26 kB[22m
+[2mdist/[22m[2massets/[22m[36mthree-CjhsSxBY.js   [39m[1m[33m823.43 kB[39m[22m[2m │ gzip: 221.74 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 2.31s[39m
+
+[36mPWA v2.0.0[39m
+mode      [35mgenerateSW[39m
+precache  [32m11 entries[39m [2m(1404.60 KiB)[22m
+files generated
+  [2mdist/sw.js[22m
+  [2mdist/workbox-8f31ecaf.js[22m

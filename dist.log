@@ -1,0 +1,32 @@
+✓ index.html がある
+✓ sw.js がある
+✓ manifest.webmanifest がある
+✓ version.json がある
+✓ icon-192.png がある
+✓ icon-512.png がある
+✓ icon-maskable-512.png がある
+✓ apple-touch-icon.png がある
+✓ manifest.name = 競走馬オーナーズ
+✓ manifest.short_name = 競馬オーナーズ
+✓ manifest.display = standalone
+✓ manifest.background_color = #F4F2EA
+✓ manifest.theme_color = #183C30
+✓ アイコン 192x192:any
+✓ アイコン 512x512:any
+✓ アイコン 512x512:maskable
+✓ index.html がマニフェストを参照
+✓ apple-touch-icon の参照
+✓ BASE_URL が置換済み
+✓ ハッシュ付き：assets/index-DcHuT4fi.js
+✓ 事前取得の対象：assets/index-DcHuT4fi.js
+✓ ハッシュ付き：assets/three-CjhsSxBY.js
+✓ 事前取得の対象：assets/three-CjhsSxBY.js
+✓ ハッシュ付き：assets/react-DZAHxJIN.js
+✓ 事前取得の対象：assets/react-DZAHxJIN.js
+✓ ハッシュ付き：assets/index-OTWmL2nL.css
+✓ 事前取得の対象：assets/index-OTWmL2nL.css
+✓ 事前取得の対象：index.html
+✓ API は事前取得しない
+✓ version.json：f887b6c8
+
+ビルド成果物は公開できる状態です
