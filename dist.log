@@ -17,16 +17,16 @@
 ✓ index.html がマニフェストを参照
 ✓ apple-touch-icon の参照
 ✓ BASE_URL が置換済み
-✓ ハッシュ付き：assets/index-DcHuT4fi.js
-✓ 事前取得の対象：assets/index-DcHuT4fi.js
+✓ ハッシュ付き：assets/index-CzMAwgGN.js
+✓ 事前取得の対象：assets/index-CzMAwgGN.js
 ✓ ハッシュ付き：assets/three-CjhsSxBY.js
 ✓ 事前取得の対象：assets/three-CjhsSxBY.js
 ✓ ハッシュ付き：assets/react-DZAHxJIN.js
 ✓ 事前取得の対象：assets/react-DZAHxJIN.js
-✓ ハッシュ付き：assets/index-OTWmL2nL.css
-✓ 事前取得の対象：assets/index-OTWmL2nL.css
+✓ ハッシュ付き：assets/index-dutxhhTB.css
+✓ 事前取得の対象：assets/index-dutxhhTB.css
 ✓ 事前取得の対象：index.html
 ✓ API は事前取得しない
-✓ version.json：f887b6c8
+✓ version.json：db97b274
 
 ビルド成果物は公開できる状態です

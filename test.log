@@ -1,292 +1,292 @@
-ok 45 - コース座標は一周でつながり、継ぎ目で連続している
-  ---
-  duration_ms: 3.648467
-  type: 'test'
-  ...
-# Subtest: 再生補間と途中順位
-ok 46 - 再生補間と途中順位
-  ---
-  duration_ms: 0.521135
-  type: 'test'
-  ...
-# Subtest: 着差とタイムの表記
-ok 47 - 着差とタイムの表記
-  ---
-  duration_ms: 0.184868
-  type: 'test'
-  ...
-# Subtest: CPU馬はシードで再現でき、番組が上のクラスほど強い
-ok 48 - CPU馬はシードで再現でき、番組が上のクラスほど強い
-  ---
-  duration_ms: 0.739995
-  type: 'test'
-  ...
-# Subtest: resolveRace：所有馬だけ状態が更新され、賞金は指定の関数で決まる
-ok 49 - resolveRace：所有馬だけ状態が更新され、賞金は指定の関数で決まる
-  ---
-  duration_ms: 5.110113
-  type: 'test'
-  ...
-1..49
-# tests 49
-# suites 0
-# pass 49
-# fail 0
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 11675.567267
-
-> @owners/client@0.1.0 test
-> tsx --test test/*.test.ts
-
-TAP version 13
-# Subtest: 保存して読み込むと同じデータに戻る（書き出し・読み込みも）
-ok 1 - 保存して読み込むと同じデータに戻る（書き出し・読み込みも）
-  ---
-  duration_ms: 7.632117
-  type: 'test'
-  ...
-# Subtest: 壊れたセーブは検出しても消さない（控えに写し、直前の正常な状態に戻せる）
-ok 2 - 壊れたセーブは検出しても消さない（控えに写し、直前の正常な状態に戻せる）
-  ---
-  duration_ms: 5.215056
-  type: 'test'
-  ...
-# Subtest: 旧形式（バージョン1）のセーブを新しい馬主システムへ引き継ぐ
-ok 3 - 旧形式（バージョン1）のセーブを新しい馬主システムへ引き継ぐ
-  ---
-  duration_ms: 15.866801
-  type: 'test'
-  ...
-# Subtest: レース観戦中・処理中など、ブロッカーがあるときはどの場面でも切り替えない
-ok 4 - レース観戦中・処理中など、ブロッカーがあるときはどの場面でも切り替えない
-  ---
-  duration_ms: 1.322558
-  type: 'test'
-  ...
-# Subtest: 準備ができていなければ切り替えない
-ok 5 - 準備ができていなければ切り替えない
-  ---
-  duration_ms: 0.124117
-  type: 'test'
-  ...
-# Subtest: 画面が裏に回ったとき・「更新を適用」を押したときは切り替える
-ok 6 - 画面が裏に回ったとき・「更新を適用」を押したときは切り替える
-  ---
-  duration_ms: 0.095413
-  type: 'test'
-  ...
-# Subtest: 起動直後でまだ操作していなければその場で切り替え、操作を始めていたら待つ
-ok 7 - 起動直後でまだ操作していなければその場で切り替え、操作を始めていたら待つ
-  ---
-  duration_ms: 0.108884
-  type: 'test'
-  ...
-# Subtest: 処理が終わったときは、「更新を適用」を押して待っていた場合だけ切り替える
-ok 8 - 処理が終わったときは、「更新を適用」を押して待っていた場合だけ切り替える
-  ---
-  duration_ms: 0.182875
-  type: 'test'
-  ...
-# Subtest: ほかのタブが更新したとき、レース中のタブは読み込み直さない
-ok 9 - ほかのタブが更新したとき、レース中のタブは読み込み直さない
-  ---
-  duration_ms: 0.124548
-  type: 'test'
-  ...
-# Subtest: 更新の確認：起動時と手動は必ず、復帰時は10分以上、定期は約45分ごと、裏にいる間はしない
-ok 10 - 更新の確認：起動時と手動は必ず、復帰時は10分以上、定期は約45分ごと、裏にいる間はしない
-  ---
-  duration_ms: 0.228074
-  type: 'test'
-  ...
-# Subtest: ブロッカーの表示名
-ok 11 - ブロッカーの表示名
-  ---
-  duration_ms: 0.115524
-  type: 'test'
-  ...
-# Subtest: ビューモデル（所有馬・報告・出走候補・販売馬・重要事項）に非公開データが含まれない
-ok 12 - ビューモデル（所有馬・報告・出走候補・販売馬・重要事項）に非公開データが含まれない
-  ---
-  duration_ms: 46.819611
-  type: 'test'
-  ...
-# Subtest: 報告の重要度と未確認の判定
-ok 13 - 報告の重要度と未確認の判定
-  ---
-  duration_ms: 35.883149
-  type: 'test'
-  ...
-# Subtest: 重要事項は緊急 → 要確認 → 通常の順に並ぶ
-ok 14 - 重要事項は緊急 → 要確認 → 通常の順に並ぶ
-  ---
-  duration_ms: 20.995878
-  type: 'test'
-  ...
-1..14
-# tests 14
-# suites 0
-# pass 14
-# fail 0
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 448.417464
-
-> @owners/server@0.1.0 test
-> tsx --test test/*.test.ts
-
-TAP version 13
-# Subtest: JWT: 正しいトークンは検証でき、改ざん・期限切れ・別鍵は拒否
-ok 1 - JWT: 正しいトークンは検証でき、改ざん・期限切れ・別鍵は拒否
-  ---
-  duration_ms: 1.276823
-  type: 'test'
-  ...
-# Subtest: パスワード: ハッシュは毎回異なり、正しいパスワードだけ通る
-ok 2 - パスワード: ハッシュは毎回異なり、正しいパスワードだけ通る
-  ---
-  duration_ms: 147.728652
-  type: 'test'
-  ...
-# Subtest: レート制限
-ok 3 - レート制限
-  ---
-  duration_ms: 0.370428
-  type: 'test'
-  ...
-# Subtest: 新規登録 → 初期馬選択 → 調教 → 休養 → 詳細表示 の一連の流れ
-ok 4 - 新規登録 → 初期馬選択 → 調教 → 休養 → 詳細表示 の一連の流れ
-  ---
-  duration_ms: 432.30301
-  type: 'test'
-  ...
-# Subtest: 認証と入力検証
-ok 5 - 認証と入力検証
-  ---
-  duration_ms: 119.11022
-  type: 'test'
-  ...
-# Subtest: 操作の連打はレート制限される
-ok 6 - 操作の連打はレート制限される
-  ---
-  duration_ms: 90.57658
-  type: 'test'
-  ...
-# Subtest: CORS：許可したオリジンだけ API を呼べる（事前確認にも応じる）
-ok 7 - CORS：許可したオリジンだけ API を呼べる（事前確認にも応じる）
-  ---
-  duration_ms: 731.675002
-  type: 'test'
-  ...
-# Subtest: 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
-ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
-  ---
-  duration_ms: 97.152444
-  type: 'test'
-  ...
+#   internalQuery: undefined,
+#   where: undefined,
+#   schema: undefined,
+#   table: undefined,
+#   column: undefined,
+#   dataType: undefined,
+#   constraint: undefined,
+#   file: 'postgres.c',
+#   line: '3286',
+#   routine: 'ProcessInterrupts',
+#   client: Client {
+#     _events: [Object: null prototype] { error: [Function (anonymous)] },
+#     _eventsCount: 1,
+#     _maxListeners: undefined,
+#     connectionParameters: ConnectionParameters {
+#       user: 'postgres',
+#       database: 'horses_test_7954697c',
+#       port: 5432,
+#       host: 'localhost',
+#       binary: false,
+#       options: undefined,
+#       ssl: false,
+#       sslnegotiation: undefined,
+#       client_encoding: '',
+#       replication: undefined,
+#       isDomainSocket: false,
+#       application_name: undefined,
+#       fallback_application_name: undefined,
+#       statement_timeout: false,
+#       lock_timeout: false,
+#       idle_in_transaction_session_timeout: false,
+#       query_timeout: false,
+#       connect_timeout: 0
+#     },
+#     user: 'postgres',
+#     database: 'horses_test_7954697c',
+#     port: 5432,
+#     host: 'localhost',
+#     replication: undefined,
+#     _Promise: [Function: Promise],
+#     _types: TypeOverrides { _types: [Object], text: {}, binary: {} },
+#     _ending: true,
+#     _ended: false,
+#     _connecting: false,
+#     _connected: true,
+#     _connectionError: false,
+#     _queryable: false,
+#     _activeQuery: null,
+#     _txStatus: 'I',
+#     enableChannelBinding: false,
+#     scramMaxIterations: 100000,
+#     connection: Connection {
+#       _events: [Object: null prototype],
+#       _eventsCount: 23,
+#       _maxListeners: undefined,
+#       stream: [Socket],
+#       _keepAlive: false,
+#       _keepAliveInitialDelayMillis: 0,
+#       parsedStatements: {},
+#       submittedNamedStatements: {},
+#       ssl: false,
+#       sslNegotiation: 'postgres',
+#       _ending: true,
+#       _emitMessage: false,
+#       _connecting: true,
+#       [Symbol(shapeMode)]: false,
+#       [Symbol(kCapture)]: false
+#     },
+#     _queryQueue: [],
+#     _sentQueryQueue: [],
+#     pipeline: false,
+#     binary: false,
+#     processID: 184,
+#     secretKey: -878135659,
+#     ssl: false,
+#     sslNegotiation: 'postgres',
+#     _connectionTimeoutMillis: 0,
+#     _connectionCallback: null,
+#     release: [Function (anonymous)],
+#     readyForQuery: true,
+#     hasExecuted: true,
+#     _poolUseCount: 1,
+#     [Symbol(shapeMode)]: false,
+#     [Symbol(kCapture)]: false
+#   }
+# }
+# [db] idle client error error: terminating connection due to administrator command
+#     at parseErrorMessage (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:395:9)
+#     at Parser.handlePacket (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:212:19)
+#     at Parser.parse (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:105:30)
+#     at Socket.<anonymous> (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/index.ts:7:48)
+#     at Socket.emit (node:events:519:28)
+#     at addChunk (node:internal/streams/readable:561:12)
+#     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+#     at Readable.push (node:internal/streams/readable:392:5)
+#     at TCP.onStreamRead (node:internal/stream_base_commons:189:23) {
+#   length: 116,
+#   severity: 'FATAL',
+#   code: '57P01',
+#   detail: undefined,
+#   hint: undefined,
+#   position: undefined,
+#   internalPosition: undefined,
+#   internalQuery: undefined,
+#   where: undefined,
+#   schema: undefined,
+#   table: undefined,
+#   column: undefined,
+#   dataType: undefined,
+#   constraint: undefined,
+#   file: 'postgres.c',
+#   line: '3286',
+#   routine: 'ProcessInterrupts',
+#   client: Client {
+#     _events: [Object: null prototype] { error: [Function (anonymous)] },
+#     _eventsCount: 1,
+#     _maxListeners: undefined,
+#     connectionParameters: ConnectionParameters {
+#       user: 'postgres',
+#       database: 'horses_test_7954697c',
+#       port: 5432,
+#       host: 'localhost',
+#       binary: false,
+#       options: undefined,
+#       ssl: false,
+#       sslnegotiation: undefined,
+#       client_encoding: '',
+#       replication: undefined,
+#       isDomainSocket: false,
+#       application_name: undefined,
+#       fallback_application_name: undefined,
+#       statement_timeout: false,
+#       lock_timeout: false,
+#       idle_in_transaction_session_timeout: false,
+#       query_timeout: false,
+#       connect_timeout: 0
+#     },
+#     user: 'postgres',
+#     database: 'horses_test_7954697c',
+#     port: 5432,
+#     host: 'localhost',
+#     replication: undefined,
+#     _Promise: [Function: Promise],
+#     _types: TypeOverrides { _types: [Object], text: {}, binary: {} },
+#     _ending: true,
+#     _ended: false,
+#     _connecting: false,
+#     _connected: true,
+#     _connectionError: false,
+#     _queryable: false,
+#     _activeQuery: null,
+#     _txStatus: 'I',
+#     enableChannelBinding: false,
+#     scramMaxIterations: 100000,
+#     connection: Connection {
+#       _events: [Object: null prototype],
+#       _eventsCount: 23,
+#       _maxListeners: undefined,
+#       stream: [Socket],
+#       _keepAlive: false,
+#       _keepAliveInitialDelayMillis: 0,
+#       parsedStatements: {},
+#       submittedNamedStatements: {},
+#       ssl: false,
+#       sslNegotiation: 'postgres',
+#       _ending: true,
+#       _emitMessage: false,
+#       _connecting: true,
+#       [Symbol(shapeMode)]: false,
+#       [Symbol(kCapture)]: false
+#     },
+#     _queryQueue: [],
+#     _sentQueryQueue: [],
+#     pipeline: false,
+#     binary: false,
+#     processID: 183,
+#     secretKey: -204857841,
+#     ssl: false,
+#     sslNegotiation: 'postgres',
+#     _connectionTimeoutMillis: 0,
+#     _connectionCallback: null,
+#     release: [Function (anonymous)],
+#     readyForQuery: true,
+#     hasExecuted: true,
+#     _poolUseCount: 1,
+#     [Symbol(shapeMode)]: false,
+#     [Symbol(kCapture)]: false
+#   }
+# }
 # Subtest: 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
 ok 9 - 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
   ---
-  duration_ms: 420.70113
+  duration_ms: 408.894609
   type: 'test'
   ...
 # Subtest: レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
 ok 10 - レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
   ---
-  duration_ms: 82.601602
+  duration_ms: 182.173394
   type: 'test'
   ...
 # Subtest: 全員が切断してもレースは確定・保存される
 ok 11 - 全員が切断してもレースは確定・保存される
   ---
-  duration_ms: 89.423673
+  duration_ms: 161.638111
   type: 'test'
   ...
 # Subtest: 1頭だけなら締切を延長し、2頭目の登録後に開始する
 ok 12 - 1頭だけなら締切を延長し、2頭目の登録後に開始する
   ---
-  duration_ms: 90.867272
+  duration_ms: 150.297541
   type: 'test'
   ...
 # Subtest: 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
 ok 13 - 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
   ---
-  duration_ms: 751.117639
+  duration_ms: 525.421254
   type: 'test'
   ...
 # Subtest: 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
 ok 14 - 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
   ---
-  duration_ms: 82.587906
+  duration_ms: 107.019596
   type: 'test'
   ...
 # Subtest: 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
 ok 15 - 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
   ---
-  duration_ms: 30.232139
+  duration_ms: 42.970911
   type: 'test'
   ...
 # Subtest: 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
 ok 16 - 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
   ---
-  duration_ms: 372.3435
+  duration_ms: 476.060437
   type: 'test'
   ...
 # Subtest: 初期馬は1回だけ選べる（同時リクエストでも1頭）
 ok 17 - 初期馬は1回だけ選べる（同時リクエストでも1頭）
   ---
-  duration_ms: 56.419141
+  duration_ms: 89.308473
   type: 'test'
   ...
 # Subtest: 調教で能力が上がり所持金が減る。休養で疲労が回復する
 ok 18 - 調教で能力が上がり所持金が減る。休養で疲労が回復する
   ---
-  duration_ms: 55.297412
+  duration_ms: 58.626756
   type: 'test'
   ...
 # Subtest: 他人の馬は調教できない
 ok 19 - 他人の馬は調教できない
   ---
-  duration_ms: 103.060311
+  duration_ms: 117.584762
   type: 'test'
   ...
 # Subtest: 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
 ok 20 - 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
   ---
-  duration_ms: 161.136084
+  duration_ms: 75.325574
   type: 'test'
   ...
 # Subtest: レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
 ok 21 - レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
   ---
-  duration_ms: 326.308445
+  duration_ms: 128.707353
   type: 'test'
   ...
 # Subtest: 同じ raceId で同時に精算を呼んでも1回しか成功しない
 ok 22 - 同じ raceId で同時に精算を呼んでも1回しか成功しない
   ---
-  duration_ms: 164.824925
+  duration_ms: 132.604687
   type: 'test'
   ...
 # Subtest: 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
 ok 23 - 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
   ---
-  duration_ms: 67.826745
+  duration_ms: 98.775013
   type: 'test'
   ...
 # Subtest: 他人の馬を自分の名義で精算させようとしても除外される
 ok 24 - 他人の馬を自分の名義で精算させようとしても除外される
   ---
-  duration_ms: 85.633164
+  duration_ms: 143.329168
   type: 'test'
   ...
 # Subtest: ランキングは獲得賞金順
 ok 25 - ランキングは獲得賞金順
   ---
-  duration_ms: 1.582313
+  duration_ms: 2.529268
   type: 'test'
   ...
 1..25
@@ -297,4 +297,4 @@ ok 25 - ランキングは獲得賞金順
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4800.058419
+# duration_ms 4630.841906
