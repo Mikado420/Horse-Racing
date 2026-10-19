@@ -8,7 +8,8 @@ const RECONNECT_KEY = "owners.reconnectToken";
 
 export function serverUrl(): string {
   const env = import.meta.env.VITE_SERVER_URL as string | undefined;
-  if (env) return env;
+  // HTTPS で公開しているページからは暗号化された WebSocket（wss）でしか接続できない
+  if (env) return location.protocol === "https:" ? env.replace(/^ws:\/\//, "wss://") : env;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   // 開発時（Vite）はゲームサーバーの 2567 番へ、本番は同じホストへ接続
   return import.meta.env.DEV ? `${proto}://${location.hostname}:2567` : `${proto}://${location.host}`;

@@ -25,6 +25,11 @@ export function loadConfig() {
     jwtSecret,
     registrationMs: num("REGISTRATION_SECONDS", 30) * 1000,
     replaySpeed: num("REPLAY_SPEED", 2),
+    /** 別のドメインに置いたクライアントからの API 呼び出しを許可するオリジン（カンマ区切り。例: https://mikado420.github.io） */
+    corsOrigins: (process.env.CORS_ORIGINS ?? "")
+      .split(",")
+      .map((s) => s.trim().replace(/\/$/, ""))
+      .filter(Boolean),
     /** ビルド済みクライアント（あれば同じポートで配信する） */
     staticDir: path.resolve(here, "../../client/dist"),
   };

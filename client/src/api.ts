@@ -3,6 +3,12 @@ import type { Horse, PlayerProfile, Stats, StarterTemplate, CourseDef, ResultRow
 
 const TOKEN_KEY = "owners.token";
 
+/**
+ * API の接続先。同じホストで配信するときは空（/api へ）。
+ * 静的ホスティングとゲームサーバーを分けるときは VITE_API_BASE（例: https://api.example.com）を指定してビルドする。
+ */
+export const API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
+
 export function getToken(): string | null {
   try {
     return localStorage.getItem(TOKEN_KEY);
@@ -32,7 +38,7 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
   const token = getToken();
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}/api${path}`, {
       method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
       headers: {
         "Content-Type": "application/json",

@@ -248,7 +248,27 @@ export function migrateV1(raw: Record<string, unknown>): OwnerSave {
 
 /* ---------------- 保存先 ---------------- */
 
-export function loadSave(kv: KeyValueStore): { save: OwnerSave | null; error?: string; notice?: string } {
+/** 起動時に正常に読み込めたセーブの控え（更新後に読めなくなった場合などに戻せるように） */
+export const GOOD_KEY = "owners.offline.save.lastGood";
+
+export interface LoadResult {
+  save: OwnerSave | null;
+  error?: string;
+  notice?: string;
+  /** 読み込めないデータが残っている（初期化はしていない） */
+  broken?: boolean;
+  /** 戻せる控えがある */
+  canRestore?: boolean;
+}
+
+/**
+ * セーブを読み込む。
+ * ・読み込めたら、その内容を控え（GOOD_KEY）として保存する
+ * ・旧形式なら変換する。変換前のデータは V1_BACKUP_KEY に残す
+ * ・読み込めない（壊れている・変換できない）場合は、データを消さずにそのまま残し、
+ *   控えにも写してからプレイヤーに選んでもらう（無断で初期化しない）
+ */
+export function loadSave(kv: KeyValueStore): LoadResult {
   const text = kv.getItem(SAVE_KEY);
   if (!text) return { save: null };
   try {
@@ -257,19 +277,58 @@ export function loadSave(kv: KeyValueStore): { save: OwnerSave | null; error?: s
     if (isObj(raw) && raw.version === 1) {
       kv.setItem(V1_BACKUP_KEY, text);
       kv.setItem(SAVE_KEY, JSON.stringify(save));
+      snapshot(kv, JSON.stringify(save));
       return {
         save,
         notice: "旧形式のセーブデータを新しい馬主システムへ引き継ぎました。旧形式で見えていた能力は判明済みとして扱い、加速力・適性・個性はこれから見極めます。",
       };
     }
+    snapshot(kv, text);
     return { save };
   } catch (e) {
-    // 壊れたデータは消さずに退避しておく
-    kv.setItem(BACKUP_KEY, text);
-    kv.removeItem(SAVE_KEY);
+    try {
+      kv.setItem(BACKUP_KEY, text);
+    } catch {
+      /* 控えを書けなくても、元のデータは SAVE_KEY に残っている */
+    }
     const msg = e instanceof OwnerGameError ? e.message : "セーブデータを読み込めませんでした";
-    return { save: null, error: `${msg}。壊れたデータは退避し、新しく始められる状態にしました。` };
+    return { save: null, broken: true, canRestore: restorable(kv) !== null, error: `${msg}。データは消さずに残してあります。` };
   }
+}
+
+function snapshot(kv: KeyValueStore, text: string) {
+  try {
+    kv.setItem(GOOD_KEY, text);
+  } catch {
+    // 容量不足のときは控えを作らない（本体の保存を優先する）
+  }
+}
+
+/** 戻せる控え（読み込めるもの）があれば返す。直近の正常な控え → 旧形式の元データ の順に探す */
+export function restorable(kv: KeyValueStore): OwnerSave | null {
+  for (const key of [GOOD_KEY, V1_BACKUP_KEY]) {
+    const t = kv.getItem(key);
+    if (!t) continue;
+    try {
+      return parseSave(JSON.parse(t));
+    } catch {
+      /* 次の候補へ */
+    }
+  }
+  return null;
+}
+
+/** 控えから戻す。今の（読み込めない）データは BACKUP_KEY に残したまま */
+export function restoreFromBackup(kv: KeyValueStore): OwnerSave {
+  const save = restorable(kv);
+  if (!save) throw new OwnerGameError("戻せる控えがありません");
+  writeSave(kv, save);
+  return save;
+}
+
+/** 読み込めなかったデータの中身（ファイルへの書き出し用） */
+export function brokenText(kv: KeyValueStore): string | null {
+  return kv.getItem(SAVE_KEY) ?? kv.getItem(BACKUP_KEY);
 }
 
 export function writeSave(kv: KeyValueStore, save: OwnerSave): void {

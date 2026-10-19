@@ -17,6 +17,8 @@ export interface AppDeps {
   db: Db;
   jwtSecret: string;
   staticDir?: string;
+  /** API の呼び出しを許可する別ドメインのオリジン */
+  corsOrigins?: string[];
 }
 
 interface Ctx {
@@ -76,6 +78,8 @@ function send(res: ServerResponse, status: number, data: unknown) {
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
+  ".woff2": "font/woff2",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -84,6 +88,18 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+/**
+ * 静的ファイルのキャッシュ設定：
+ * ・ファイル名にハッシュが付いた assets/ は長期キャッシュ（中身が変わると名前も変わる）
+ * ・HTML・Service Worker・マニフェスト・version.json は毎回確認させ、更新の検知を妨げない
+ */
+export function cacheControlFor(dir: string, file: string): string {
+  const rel = path.relative(dir, file).split(path.sep).join("/");
+  if (rel.startsWith("assets/")) return "public, max-age=31536000, immutable";
+  if (/(^|\/)(sw\.js|workbox-[^/]+\.js|index\.html|manifest\.webmanifest|version\.json)$/.test(rel) || rel.endsWith(".html")) return "no-cache";
+  return "public, max-age=3600";
+}
+
 function serveStatic(dir: string, urlPath: string, res: ServerResponse): boolean {
   if (!fs.existsSync(dir)) return false;
   const safe = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
@@ -91,7 +107,7 @@ function serveStatic(dir: string, urlPath: string, res: ServerResponse): boolean
   if (!file.startsWith(dir)) return false;
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(dir, "index.html"); // SPA
   if (!fs.existsSync(file)) return false;
-  res.writeHead(200, { "Content-Type": MIME[path.extname(file)] ?? "application/octet-stream" });
+  res.writeHead(200, { "Content-Type": MIME[path.extname(file)] ?? "application/octet-stream", "Cache-Control": cacheControlFor(dir, file) });
   fs.createReadStream(file).pipe(res);
   return true;
 }
@@ -178,6 +194,21 @@ export function createApp(deps: AppDeps) {
     const url = new URL(req.url ?? "/", "http://localhost");
     // Colyseus のマッチメイク用パスには触れない
     if (url.pathname.startsWith("/matchmake")) return;
+
+    // 別ドメインのクライアント（許可したオリジンだけ）からの API 呼び出し
+    const origin = req.headers.origin;
+    if (origin && url.pathname.startsWith("/api/") && deps.corsOrigins?.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Max-Age", "600");
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+    }
 
     if (!url.pathname.startsWith("/api/")) {
       if ((req.method === "GET" || req.method === "HEAD") && deps.staticDir && serveStatic(deps.staticDir, url.pathname, res)) {

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#183C30"/>
+  <circle cx="256" cy="256" r="214" fill="none" stroke="#C7A45B" stroke-opacity="0.35" stroke-width="3"/>
+  <path d="M 340.88209643996083 192.0303122858383 A 118 118 0 1 1 171.11790356003917 192.0303122858383" fill="none" stroke="#C7A45B" stroke-width="54" stroke-linecap="butt"/>
+  <rect x="355.9040226953169" y="209.9708780161991" width="10" height="20" rx="4" transform="rotate(62.75 360.9040226953169 219.9708780161991)" fill="#183C30"/>
+  <rect x="368.29864791023374" y="276.8462912325318" width="10" height="20" rx="4" transform="rotate(96.25 373.29864791023374 286.8462912325318)" fill="#183C30"/>
+  <rect x="341.7233361846682" y="339.453802233709" width="10" height="20" rx="4" transform="rotate(129.75 346.7233361846682 349.453802233709)" fill="#183C30"/>
+  <rect x="160.27666381533174" y="339.453802233709" width="10" height="20" rx="4" transform="rotate(230.25000000000003 165.27666381533174 349.453802233709)" fill="#183C30"/>
+  <rect x="133.7013520897663" y="276.84629123253177" width="10" height="20" rx="4" transform="rotate(263.75 138.7013520897663 286.84629123253177)" fill="#183C30"/>
+  <rect x="146.09597730468306" y="209.97087801619915" width="10" height="20" rx="4" transform="rotate(297.25 151.09597730468306 219.97087801619915)" fill="#183C30"/>
+</svg>

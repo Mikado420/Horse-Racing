@@ -19,6 +19,8 @@ import { RecordsScreen } from "./RecordsScreen";
 import { RaceViewer } from "./RaceViewer";
 import { SettingsPanel } from "./SettingsPanel";
 import { TodoList } from "./OwnerHome";
+import { useToast } from "./feedback";
+import { APP_VERSION, takeUpdatedFlag } from "../pwa/update";
 
 const TAB_ROOT: Record<NavTab, Route> = {
   home: { tab: "home" },
@@ -103,6 +105,17 @@ function OwnerInner({
   sound: (id: SoundId) => void;
 }) {
   const nav = useNavStack();
+  const toast = useToast();
+  // 新しいバージョンに切り替わった直後なら知らせる（セーブは通常どおり読み込み済み）
+  useEffect(() => {
+    const from = takeUpdatedFlag();
+    if (from && game.save && !game.loadError) toast(`新しいバージョン（${APP_VERSION}）に更新しました。セーブデータはそのままです`, "good");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ほかのタブで保存された内容を読み込んだら知らせる
+  const syncs = game.externalSyncs;
+  useEffect(() => {
+    if (syncs > 0) toast("別のタブでの変更を読み込みました", "info");
+  }, [syncs]); // eslint-disable-line react-hooks/exhaustive-deps
   const [sheet, setSheet] = useState<"notices" | "settings" | null>(null);
   const [running, setRunning] = useState<RunningRace | null>(null);
   const save = game.save;
@@ -139,6 +152,15 @@ function OwnerInner({
     return (
       <NewGameScreen
         loadError={game.loadError}
+        broken={game.broken}
+        brokenText={game.brokenText}
+        onRestore={() => {
+          try {
+            game.restoreBackup();
+          } catch (e) {
+            window.alert((e as Error).message);
+          }
+        }}
         onStart={(n) => {
           game.newGame(n);
           nav.switchTab("home");

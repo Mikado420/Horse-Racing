@@ -1,6 +1,7 @@
 // 共通の通知（ToastNotification）と確認ダイアログ（ConfirmActionDialog）
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
+import { useUpdateBlocker } from "../pwa/hooks";
 
 /* ---------------- Toast ---------------- */
 
@@ -42,6 +43,8 @@ export function FeedbackProvider({ children, onSound }: { children: ReactNode; o
     [onSound],
   );
   const ask = useCallback((o: ConfirmOptions) => new Promise<boolean>((resolve) => setConfirm({ ...o, resolve })), []);
+  // 確認の途中は新しいバージョンへ切り替えない
+  useUpdateBlocker("dialog", !!confirm);
   const close = (v: boolean) => {
     confirm?.resolve(v);
     setConfirm(null);
@@ -157,6 +160,8 @@ export function LoadingState({ label = "読み込み中" }: { label?: string }) 
 export function useBusy() {
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
+  // 週送り・出走確定・購入などの処理中は新しいバージョンへ切り替えない
+  useUpdateBlocker("busy", busy);
   const run = useCallback(async (f: () => unknown | Promise<unknown>) => {
     if (lock.current) return;
     lock.current = true;

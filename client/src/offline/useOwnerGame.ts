@@ -1,8 +1,8 @@
 // オフライン版（馬主モード）のゲーム状態を React で扱うフック。操作のたびに自動で保存する。
 // ルールと計算はすべて shared の純粋関数（advanceWeek・runOwnerRace など）に任せ、ここでは保存と画面への受け渡しだけをする。
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as G from "@owners/shared";
-import { browserStore, deleteSave, exportSave, importSave, loadSave, writeSave } from "./storage";
+import { SAVE_KEY, brokenText, browserStore, deleteSave, exportSave, importSave, loadSave, parseSave, restoreFromBackup, writeSave } from "./storage";
 
 /** 操作ごとの乱数シード（暗号論的乱数を使えるときは使う） */
 export function freshSeed(): number {
@@ -16,7 +16,11 @@ export function freshSeed(): number {
 export interface OwnerGame {
   save: G.OwnerSave | null;
   loadError: string | null;
+  /** 読み込めないセーブが残っている（消していない） */
+  broken: { canRestore: boolean } | null;
   notice: string | null;
+  /** ほかのタブでの保存を読み込んだ回数（表示用） */
+  externalSyncs: number;
   storageError: string | null;
   dismissNotice(): void;
   newGame(ownerName: string): void;
@@ -32,6 +36,10 @@ export interface OwnerGame {
   exportText(): string;
   importText(text: string): void;
   reset(): void;
+  /** 読み込めないセーブをファイルとして取り出す */
+  brokenText(): string | null;
+  /** 直前の正常な控えに戻す */
+  restoreBackup(): void;
 }
 
 export function useOwnerGame(): OwnerGame {
@@ -41,6 +49,31 @@ export function useOwnerGame(): OwnerGame {
   const [loadError, setLoadError] = useState<string | null>(initial.error ?? null);
   const [notice, setNotice] = useState<string | null>(initial.notice ?? null);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [broken, setBroken] = useState<{ canRestore: boolean } | null>(initial.broken ? { canRestore: !!initial.canRestore } : null);
+  const [externalSyncs, setExternalSyncs] = useState(0);
+  const persisted = useRef(false);
+
+  // ほかのタブで保存されたら、その内容に合わせる（古い内容で上書きしないため）
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SAVE_KEY || e.storageArea !== localStorage) return;
+      if (e.newValue === null) {
+        ref.current = null;
+        setSave(null);
+        return;
+      }
+      try {
+        const next = parseSave(JSON.parse(e.newValue));
+        ref.current = next;
+        setSave(next);
+        setExternalSyncs((n) => n + 1);
+      } catch {
+        /* 読み込めない内容なら、今の状態を保つ */
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
   // 非同期の画面処理から常に最新のセーブを参照するため ref にも持つ
   const ref = useRef(save);
   ref.current = save;
@@ -51,6 +84,12 @@ export function useOwnerGame(): OwnerGame {
       try {
         writeSave(store, next);
         setStorageError(null);
+        setBroken(null);
+        // ブラウザに、空き容量が少ないときでもこのデータを消さないよう頼む（対応ブラウザのみ・一度だけ）
+        if (!persisted.current) {
+          persisted.current = true;
+          void navigator.storage?.persist?.().catch(() => undefined);
+        }
       } catch {
         setStorageError("ブラウザへの保存に失敗しました（容量不足の可能性があります）。ファイルに書き出して保管してください。");
       }
@@ -67,6 +106,8 @@ export function useOwnerGame(): OwnerGame {
   return {
     save,
     loadError,
+    broken,
+    externalSyncs,
     notice,
     storageError,
     dismissNotice: () => setNotice(null),
@@ -121,6 +162,14 @@ export function useOwnerGame(): OwnerGame {
     importText: (text) => {
       setLoadError(null);
       commit(importSave(text));
+    },
+    brokenText: () => brokenText(store),
+    restoreBackup: () => {
+      const s = restoreFromBackup(store);
+      ref.current = s;
+      setSave(s);
+      setBroken(null);
+      setLoadError(null);
     },
     reset: () => {
       deleteSave(store);

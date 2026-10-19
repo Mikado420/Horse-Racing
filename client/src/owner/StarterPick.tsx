@@ -5,6 +5,7 @@ import type { OwnerGame } from "../offline/useOwnerGame";
 import { Icon } from "./icons";
 import { OfferCard, TrainerChoice } from "./offers";
 import { marketVM } from "./vm";
+import { useUpdateBlocker } from "../pwa/hooks";
 
 export function StarterPick({ game }: { game: OwnerGame }) {
   const save = game.save!;
@@ -16,6 +17,7 @@ export function StarterPick({ game }: { game: OwnerGame }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const offer = offers.find((o) => o.offerId === picked);
+  useUpdateBlocker("form:starter", !!picked || !!trainer || !!name);
   const nameError = name.trim() ? validateRaceHorseName(name) : null;
 
   const submit = () => {

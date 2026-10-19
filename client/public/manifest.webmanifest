@@ -1,0 +1,18 @@
+{
+  "name": "競走馬オーナーズ",
+  "short_name": "競馬オーナーズ",
+  "description": "馬主として馬を厩舎に預け、隠れた才能を見極め、レースで結果を出す競走馬育成ゲーム",
+  "lang": "ja",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F2EA",
+  "theme_color": "#183C30",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

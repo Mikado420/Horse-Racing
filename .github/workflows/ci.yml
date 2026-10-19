@@ -1,0 +1,102 @@
+# 作業ブランチと Pull Request の検証（公開はしない）
+# テスト・型チェック・本番と同じ設定のビルドを行い、結果とビルド成果物を ci-preview ブランチに残す。
+# ci-preview は検証用で、公開には使わない（公開は main への反映で pages.yml が行う）。
+name: CI
+
+on:
+  push:
+    branches-ignore: [main, ci-preview]
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # pipefail：tee でログを残しても、コマンドの失敗を失敗として扱う
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 依存パッケージを取得
+        run: npm install --no-audit --no-fund
+      - name: テスト（共通ロジック・オフライン版・サーバー）
+        id: test
+        continue-on-error: true
+        run: npm test 2>&1 | tee test.log
+      - name: 型チェック
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck 2>&1 | tee typecheck.log
+      - name: 本番と同じ設定でビルド
+        id: build
+        continue-on-error: true
+        working-directory: client
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_OFFLINE_ONLY: "true"
+        run: npx vite build 2>&1 | tee ../build.log
+      - name: ビルド成果物を確認（Service Worker・マニフェスト・バージョン）
+        id: dist
+        continue-on-error: true
+        run: node scripts/check-dist.mjs client/dist 2>&1 | tee dist.log
+      - name: 結果とビルド成果物を ci-preview ブランチに残す
+        if: github.event_name == 'push'
+        env:
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          mkdir -p /tmp/preview
+          if [ -d client/dist ]; then cp -r client/dist /tmp/preview/dist; fi
+          {
+            echo "branch: $BRANCH"
+            echo "sha: $SHA"
+            echo "test: ${{ steps.test.outcome }}"
+            echo "typecheck: ${{ steps.typecheck.outcome }}"
+            echo "build: ${{ steps.build.outcome }}"
+            echo "dist: ${{ steps.dist.outcome }}"
+          } > /tmp/preview/RESULT.txt
+          # 長いログは末尾だけ残す
+          for f in test typecheck build dist; do tail -n 300 "$f.log" > "/tmp/preview/$f.log" 2>/dev/null || true; done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth=1 origin ci-preview 2>/dev/null; then
+            git worktree add /tmp/ci-preview origin/ci-preview
+            git -C /tmp/ci-preview checkout -B ci-preview
+          else
+            git worktree add --detach /tmp/ci-preview
+            git -C /tmp/ci-preview checkout --orphan ci-preview
+          fi
+          cd /tmp/ci-preview
+          git rm -rq . 2>/dev/null || true
+          rm -rf ./*
+          cp -r /tmp/preview/. .
+          git add -A
+          git commit -qm "検証ビルド ${SHA::8}（$BRANCH）"
+          git push -q origin ci-preview
+      - name: いずれかが失敗したらジョブを失敗にする
+        if: steps.test.outcome != 'success' || steps.typecheck.outcome != 'success' || steps.build.outcome != 'success' || steps.dist.outcome != 'success'
+        run: |
+          echo "test=${{ steps.test.outcome }} typecheck=${{ steps.typecheck.outcome }} build=${{ steps.build.outcome }} dist=${{ steps.dist.outcome }}"
+          exit 1

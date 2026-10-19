@@ -12,6 +12,8 @@ import { RankingScreen } from "./screens/RankingScreen";
 import { hasPendingReconnect, useRaceConnection } from "./net/raceClient";
 import { useOwnerGame } from "./offline/useOwnerGame";
 import { OwnerApp } from "./owner/OwnerApp";
+import { useUpdateBlocker } from "./pwa/hooks";
+import { UpdatePill } from "./pwa/UpdatePill";
 
 /** オンライン対戦の画面（オフラインの馬主モードは owner/OwnerApp.tsx） */
 export type Screen =
@@ -31,9 +33,16 @@ export function App() {
     setModeState(m);
   };
 
-  if (mode === null) return <TitleScreen onPick={setMode} />;
-  if (mode === "offline") return <OwnerApp game={offline} onSwitchMode={() => setMode(null)} />;
-  return <OnlineApp conn={conn} onSwitchMode={() => setMode(null)} />;
+  // 馬主モードの画面には上部バーに「更新を適用」があるので、それ以外の画面だけ浮かせて表示する
+  const ownerShell = mode === "offline" && !!offline.save && !offline.save.starterOffers;
+  return (
+    <>
+      {mode === null && <TitleScreen onPick={setMode} />}
+      {mode === "offline" && <OwnerApp game={offline} onSwitchMode={() => setMode(null)} />}
+      {mode === "online" && <OnlineApp conn={conn} onSwitchMode={() => setMode(null)} />}
+      {!ownerShell && <UpdatePill />}
+    </>
+  );
 }
 
 /* ---------------- オンライン対戦 ---------------- */
@@ -43,6 +52,8 @@ function OnlineApp({ conn, onSwitchMode }: { conn: ReturnType<typeof useRaceConn
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>(() => (hasPendingReconnect() ? { name: "race" } : { name: "home" }));
   const inRace = conn.status === "connected" || conn.status === "reconnecting";
+  // オンラインのレースに参加中は新しいバージョンへ切り替えない
+  useUpdateBlocker("online", inRace);
 
   const refresh = useCallback(async () => {
     if (!getToken()) {

@@ -1,10 +1,21 @@
-# main に Push されるたびにオフライン版（ひとりで遊ぶ）をビルドして GitHub Pages に公開する
+# 公開：main に反映されたら、テスト・型チェック・ビルド・成果物の確認がすべて通ったときだけ GitHub Pages に公開する。
+# 公開後は、配信中の version.json が今回のコミットに切り替わったことと、Service Worker・マニフェストが取得できることを確かめる。
+#
+# 元に戻すとき（ロールバック）
+#   1. 早く戻す：Actions の「GitHub Pages」から、正常だった過去の実行を開き「Re-run all jobs」
+#      （その時点のコミットで作り直して公開する）。または「Run workflow」で ref に戻したいタグ・コミットを指定する。
+#   2. 恒久的に戻す：git revert <問題のコミット> を main に push する（同じ手順で公開される）。
+#   どちらでも、利用者の端末では次の更新確認で新しい（＝戻した）版を取得し、安全なときに切り替わる。セーブデータは変わらない。
 name: GitHub Pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 公開するコミット・タグ・ブランチ（空なら main。ロールバックに使う）
+        required: false
 
 permissions:
   contents: read
@@ -13,29 +24,54 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://postgres@localhost:5432/postgres
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+      - id: ver
+        name: バージョンを決める
+        run: echo "version=$(git rev-parse --short=8 HEAD)" >> "$GITHUB_OUTPUT"
       - name: 依存パッケージを取得
         run: npm install --no-audit --no-fund
-      - name: テスト（共通ロジックとオフライン版）
-        run: npm run test:offline
-      - name: 型チェック（結果は記録のみ）
-        run: npm run typecheck -w client
-        continue-on-error: true
+      - name: テスト（共通ロジック・オフライン版・サーバー）
+        run: npm test
+      - name: 型チェック
+        run: npm run typecheck
       - name: オフライン版をビルド
-        run: npx vite build
         working-directory: client
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
           VITE_OFFLINE_ONLY: "true"
+          APP_VERSION: ${{ steps.ver.outputs.version }}
+        run: npx vite build
+      - name: ビルド成果物を確認（Service Worker・マニフェスト・バージョン）
+        run: node scripts/check-dist.mjs client/dist
+      - name: 直接開いたURLでも起動できるようにする
+        run: cp client/dist/index.html client/dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: client/dist
@@ -46,6 +82,38 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 公開後の確認
+        env:
+          URL: ${{ needs.deploy.outputs.page_url }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          URL="${URL%/}/"
+          echo "公開先: $URL（期待するバージョン: $VERSION）"
+          # CDN のキャッシュ（最大10分）が切り替わるまで待つ
+          for i in $(seq 1 40); do
+            got=$(curl -fsS -H 'Cache-Control: no-cache' "${URL}version.json?t=$(date +%s)" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)
+            if [ "$got" = "$VERSION" ]; then echo "✓ version.json = $got"; break; fi
+            echo "待機中（現在: ${got:-取得できず}）"; sleep 15
+          done
+          [ "$got" = "$VERSION" ] || { echo "✗ 公開中のバージョンが切り替わりませんでした"; exit 1; }
+          check() {
+            local path="$1" type="$2"
+            local h; h=$(curl -fsSI "${URL}${path}?t=$(date +%s)")
+            echo "$h" | grep -Eqi "^content-type: *($type)" && echo "✓ $path ($type)" || { echo "✗ $path の Content-Type が違います"; echo "$h"; exit 1; }
+          }
+          check "" "text/html"
+          check "sw.js" "application/javascript|text/javascript"
+          check "manifest.webmanifest" "application/manifest\\+json|application/json"
+          check "icon-192.png" "image/png"
+          curl -fsS "${URL}sw.js" | grep -q "index.html" && echo "✓ sw.js が index.html を事前取得" || { echo "✗ sw.js の内容が想定と違います"; exit 1; }

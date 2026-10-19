@@ -108,3 +108,59 @@ test("操作の連打はレート制限される", async () => {
   );
   assert.ok(statuses.includes(429));
 });
+
+/* ---------------- 公開構成（PWA 追加指示書 23・24章） ---------------- */
+import fs from "node:fs";
+import os from "node:os";
+import pathMod from "node:path";
+import { cacheControlFor } from "../src/http/app";
+
+async function withApp(opts: { corsOrigins?: string[]; staticDir?: string }, fn: (base: string) => Promise<void>) {
+  const t = await createTestDb();
+  const handler = createApp({ db: t.db, jwtSecret: "http-test-2", ...opts });
+  const s = http.createServer((req, res) => void handler(req, res));
+  await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
+  try {
+    await fn(`http://127.0.0.1:${(s.address() as AddressInfo).port}`);
+  } finally {
+    s.close();
+    await t.drop();
+  }
+}
+
+test("CORS：許可したオリジンだけ API を呼べる（事前確認にも応じる）", async () => {
+  await withApp({ corsOrigins: ["https://example.github.io"] }, async (b) => {
+    const pre = await fetch(`${b}/api/auth/login`, { method: "OPTIONS", headers: { Origin: "https://example.github.io", "Access-Control-Request-Method": "POST" } });
+    assert.equal(pre.status, 204);
+    assert.equal(pre.headers.get("access-control-allow-origin"), "https://example.github.io");
+    assert.match(pre.headers.get("access-control-allow-headers") ?? "", /Authorization/);
+    const ok = await fetch(`${b}/api/health`, { headers: { Origin: "https://example.github.io" } });
+    assert.equal(ok.headers.get("access-control-allow-origin"), "https://example.github.io");
+    const ng = await fetch(`${b}/api/health`, { headers: { Origin: "https://evil.example.com" } });
+    assert.equal(ng.headers.get("access-control-allow-origin"), null);
+    // 応答そのものはキャッシュさせない
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+  });
+});
+
+test("静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）", async () => {
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), "owners-static-"));
+  fs.mkdirSync(pathMod.join(dir, "assets"));
+  fs.writeFileSync(pathMod.join(dir, "index.html"), "<!doctype html><title>t</title>");
+  fs.writeFileSync(pathMod.join(dir, "sw.js"), "self.x=1");
+  fs.writeFileSync(pathMod.join(dir, "manifest.webmanifest"), "{}");
+  fs.writeFileSync(pathMod.join(dir, "assets", "index-abc123.js"), "1");
+  await withApp({ staticDir: dir }, async (b) => {
+    const m = await fetch(`${b}/manifest.webmanifest`);
+    assert.equal(m.headers.get("content-type"), "application/manifest+json");
+    assert.equal(m.headers.get("cache-control"), "no-cache");
+    assert.equal((await fetch(`${b}/sw.js`)).headers.get("cache-control"), "no-cache");
+    assert.equal((await fetch(`${b}/assets/index-abc123.js`)).headers.get("cache-control"), "public, max-age=31536000, immutable");
+    // SPA：存在しないパスは index.html
+    const spa = await fetch(`${b}/some/route`);
+    assert.match(spa.headers.get("content-type") ?? "", /text\/html/);
+    assert.equal(spa.headers.get("cache-control"), "no-cache");
+  });
+  assert.equal(cacheControlFor("/d", "/d/version.json"), "no-cache");
+  assert.equal(cacheControlFor("/d", "/d/workbox-1a2b.js"), "no-cache");
+});

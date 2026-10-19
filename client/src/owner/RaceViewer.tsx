@@ -23,11 +23,14 @@ import { useOwner } from "./context";
 import { Icon } from "./icons";
 import type { RunningRace } from "./OwnerApp";
 import { StanceTag, trainerName, yen } from "./ui";
+import { useUpdateBlocker } from "../pwa/hooks";
 
 const COUNTDOWN_MS = 3200;
 
 export function RaceViewer({ running, onExit }: { running: RunningRace; onExit: (to: "analysis" | "horse" | "race" | "home") => void }) {
   const { ui, setSettings, sound } = useOwner();
+  // 観戦中（結果を見ている間も含む）は新しいバージョンへ切り替えない
+  useUpdateBlocker("race", true);
   const { outcome } = running;
   const rec = outcome.record;
   const replay = outcome.replay;

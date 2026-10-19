@@ -7,6 +7,7 @@ import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedba
 import { OfferCard, TrainerChoice } from "./offers";
 import { yen } from "./ui";
 import { marketVM, type OfferVM } from "./vm";
+import { useUpdateBlocker } from "../pwa/hooks";
 
 export function ShopScreen() {
   const { save, vm, game, nav } = useOwner();
@@ -20,6 +21,7 @@ export function ShopScreen() {
   const active = vm.horses.length;
   const untilRefresh = Math.max(1, MARKET_REFRESH_WEEKS - (save.week - save.market.refreshedWeek));
   const nameError = name.trim() ? validateRaceHorseName(name) : null;
+  useUpdateBlocker("form:shop", !!buying);
 
   const buy = () =>
     run(async () => {

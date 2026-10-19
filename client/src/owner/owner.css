@@ -2983,3 +2983,45 @@ button.offer2 {
   outline: 3px solid var(--c-gold);
   outline-offset: 1px;
 }
+
+/* ---------- PWA：更新・インストール ---------- */
+.status-btn.is-update {
+  border-color: var(--c-gold);
+  color: #f6e2b0;
+}
+.update-pill {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--c-gold);
+  background: var(--c-brand);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  max-width: calc(100vw - 24px);
+  box-shadow: 0 6px 20px rgba(23, 36, 31, 0.25);
+}
+.app-info {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.88rem;
+}
+.app-info strong {
+  font-variant-numeric: tabular-nums;
+}
+.install-steps {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+.recover {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 1rem;
+}

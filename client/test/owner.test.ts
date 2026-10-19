@@ -11,7 +11,7 @@ import {
   newOwnerGame,
   toHorseView,
 } from "@owners/shared";
-import { BACKUP_KEY, SAVE_KEY, V1_BACKUP_KEY, exportSave, importSave, loadSave, writeSave, type KeyValueStore } from "../src/offline/storage";
+import { BACKUP_KEY, GOOD_KEY, SAVE_KEY, V1_BACKUP_KEY, brokenText, exportSave, importSave, loadSave, restoreFromBackup, writeSave, type KeyValueStore } from "../src/offline/storage";
 
 function memStore(): KeyValueStore & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -34,15 +34,29 @@ test("保存して読み込むと同じデータに戻る（書き出し・読�
   assert.deepEqual(importSave(exportSave(s)), s);
 });
 
-test("壊れたセーブは検出して退避し、新しく始められる", () => {
+test("壊れたセーブは検出しても消さない（控えに写し、直前の正常な状態に戻せる）", () => {
   const kv = memStore();
+  const good = started();
+  writeSave(kv, good);
+  assert.ok(loadSave(kv).save, "正常に読み込める");
+  assert.ok(kv.getItem(GOOD_KEY), "起動時に正常な控えを作る");
   kv.setItem(SAVE_KEY, "{not json");
   const r = loadSave(kv);
   assert.equal(r.save, null);
-  assert.ok(r.error);
+  assert.ok(r.error && r.broken);
+  assert.equal(r.canRestore, true);
+  assert.equal(kv.getItem(SAVE_KEY), "{not json", "壊れたデータを無断で消さない");
   assert.equal(kv.getItem(BACKUP_KEY), "{not json");
-  assert.equal(kv.getItem(SAVE_KEY), null);
-
+  assert.equal(brokenText(kv), "{not json");
+  const restored = restoreFromBackup(kv);
+  assert.deepEqual(restored, good);
+  assert.deepEqual(loadSave(kv).save, good);
+  // 控えもないときは戻せない
+  const kv2 = memStore();
+  kv2.setItem(SAVE_KEY, "{}");
+  const r2 = loadSave(kv2);
+  assert.equal(r2.canRestore, false);
+  assert.equal(kv2.getItem(SAVE_KEY), "{}");
   const s = started();
   const broken = JSON.parse(JSON.stringify(s));
   broken.horses[0].truth.abilities.speed = "速い";
@@ -83,6 +97,12 @@ test("旧形式（バージョン1）のセーブを新しい馬主システム�
   assert.equal(v.knowledge.speed.stage, "numeric");
   assert.equal(v.knowledge.acceleration.stage, "abstract");
   assert.equal(v.age, 3);
+  // 変換に失敗しても元データは残る（壊れた旧形式）
+  const kvBad = memStore();
+  kvBad.setItem(SAVE_KEY, JSON.stringify({ ...v1, horses: [{ name: "x" }] }));
+  const bad = loadSave(kvBad);
+  assert.equal(bad.save, null);
+  assert.ok(kvBad.getItem(SAVE_KEY), "変換できなかった旧形式を消さない");
   // 変換後の形式で保存し直し、元データも残す
   assert.equal(JSON.parse(kv.getItem(SAVE_KEY)!).version, OWNER_SAVE_VERSION);
   assert.ok(kv.getItem(V1_BACKUP_KEY));

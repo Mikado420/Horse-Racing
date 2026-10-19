@@ -5,6 +5,8 @@ import { weekLabel, shortWeekLabel } from "@owners/shared";
 import { Icon, type IconName } from "./icons";
 import { tabOf, type Nav, type NavTab } from "./context";
 import { yen } from "./ui";
+import { requestApply, useUpdateState } from "../pwa/update";
+import { blockerLabel } from "../pwa/policy";
 
 export const NAV_ITEMS: [NavTab, string, IconName][] = [
   ["home", "ホーム", "home"],
@@ -59,6 +61,7 @@ export function TopStatusBar({ s, onNotices, onSettings }: { s: StatusInfo; onNo
         <Icon name={s.saveError ? "alert" : "save"} size={16} />
         <span className="long">{saved}</span>
       </span>
+      <UpdateButton />
       <button className={`status-btn ${s.urgent ? "is-urgent" : ""}`} onClick={onNotices} aria-label={`お知らせ ${s.notices}件`}>
         <Icon name="bell" />
         <span className="status-btn-label">お知らせ</span>
@@ -69,6 +72,26 @@ export function TopStatusBar({ s, onNotices, onSettings }: { s: StatusInfo; onNo
         <span className="status-btn-label">設定</span>
       </button>
     </header>
+  );
+}
+
+/** 新しいバージョンの準備ができたときだけ出る「更新を適用」 */
+function UpdateButton() {
+  const u = useUpdateState();
+  if (u.status !== "ready" && u.status !== "applying") return null;
+  const waiting = u.requested && u.blockers.length > 0;
+  const label = u.status === "applying" ? "更新中" : waiting ? "更新待ち" : "更新を適用";
+  return (
+    <button
+      className="status-btn is-update"
+      onClick={requestApply}
+      disabled={u.status === "applying"}
+      title={waiting ? `${blockerLabel(u.blockers[0])}のため、終わってから更新します` : "新しいバージョンに切り替えます（セーブデータはそのまま）"}
+      aria-label={label}
+    >
+      <Icon name="spark" />
+      <span className="status-btn-label">{label}</span>
+    </button>
   );
 }
 

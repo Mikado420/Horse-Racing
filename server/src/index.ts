@@ -13,7 +13,7 @@ const cfg = loadConfig();
 const db = createPgPool(cfg.databaseUrl);
 await migrate(db);
 
-const handler = createApp({ db, jwtSecret: cfg.jwtSecret, staticDir: cfg.staticDir });
+const handler = createApp({ db, jwtSecret: cfg.jwtSecret, staticDir: cfg.staticDir, corsOrigins: cfg.corsOrigins });
 const httpServer = http.createServer((req, res) => {
   void handler(req, res);
 });
