@@ -90,9 +90,10 @@ jobs:
           fi
           cd /tmp/ci-preview
           git rm -rq . 2>/dev/null || true
-          rm -rf ./*
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -r /tmp/preview/. .
-          git add -A
+          # リポジトリの .gitignore は dist とログを除外するので、強制的に追加する
+          git add -Af .
           git commit -qm "検証ビルド ${SHA::8}（$BRANCH）"
           git push -q origin ci-preview
       - name: いずれかが失敗したらジョブを失敗にする
