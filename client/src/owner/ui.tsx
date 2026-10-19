@@ -13,6 +13,7 @@ import {
   type TraitView,
 } from "@owners/shared";
 import { Icon, type IconName } from "./icons";
+import { COAT_LABELS, HorseFigure, coatOf } from "./art";
 import { IMPORTANCE_LABELS, REPORT_KIND_LABELS, type HorseCardVM, type Importance, type ReportVM } from "./vm";
 
 export const STAGE_LABELS: Record<DisplayStage, string> = { abstract: "見立て", rank: "ランク判明", numeric: "数値判明" };
@@ -68,34 +69,88 @@ export function StateMeters({ s, compact }: { s: HorseState; compact?: boolean }
   );
 }
 
-/** HorseSummaryCard：所有馬の要点 */
+/** HorseSummaryCard：所有馬の要点（絵・名前・状態・次の予定・能力調査の進み具合） */
 export function HorseSummaryCard({ h, selected, onOpen }: { h: HorseCardVM; selected?: boolean; onOpen: () => void }) {
   const v = h.view;
   return (
-    <button className={`horse-card ${selected ? "is-selected" : ""}`} onClick={onOpen} aria-pressed={selected}>
-      <span className="horse-card-top">
-        <span className="horse-name">{v.name}</span>
-        <span className="pill">{v.age}歳</span>
-        {h.unreadReports > 0 && (
-          <span className="pill pill-new">
-            <Icon name="report" size={13} />
-            報告 {h.unreadReports}
-          </span>
-        )}
+    <button className={`horse-card horse-tile ${selected ? "is-selected" : ""} lv-${h.condition.level}`} onClick={onOpen} aria-pressed={selected}>
+      <span className="horse-tile-pic" aria-hidden>
+        <HorseFigure horseId={v.id} shadow={false} />
       </span>
-      <span className="horse-card-sub">{h.trainerName}厩舎</span>
-      <HorseConditionBadge c={h.condition} />
-      <span className="horse-card-plan">
-        <Icon name="clock" size={14} />
-        {h.nextPlan}
-      </span>
-      <span className="horse-card-progress" aria-label={`能力調査 ${h.known}/6 判明、解明度 ${h.progress}%`}>
-        <span className="progress-track" aria-hidden>
-          <span style={{ width: `${h.progress}%` }} />
+      <span className="horse-tile-body">
+        <span className="horse-card-top">
+          <span className="horse-name">{v.name}</span>
+          <span className="pill">{v.age}歳</span>
+          {h.unreadReports > 0 && (
+            <span className="pill pill-new">
+              <Icon name="report" size={13} />
+              報告 {h.unreadReports}
+            </span>
+          )}
         </span>
-        <span>能力調査 {h.known}/6</span>
+        <span className="horse-card-sub">
+          {COAT_LABELS[coatOf(v.id)]}／{h.trainerName}厩舎／{v.record.races}戦{v.record.wins}勝
+        </span>
+        <span className="horse-tile-state">
+          <HorseConditionBadge c={h.condition} />
+          <Mood c={v.state.condition} />
+        </span>
+        <span className="horse-card-plan">
+          <Icon name="clock" size={14} />
+          {h.nextPlan}
+        </span>
+        <span className="horse-card-progress" aria-label={`能力調査 ${h.known}/6 判明、解明度 ${h.progress}%`}>
+          <span className="progress-track" aria-hidden>
+            <span style={{ width: `${h.progress}%` }} />
+          </span>
+          <span>能力調査 {h.known}/6</span>
+        </span>
       </span>
     </button>
+  );
+}
+
+/** 調子（矢印＋言葉） */
+export function Mood({ c, large }: { c: number; large?: boolean }) {
+  const icon: IconName = c >= 1 ? "up" : c <= -1 ? "down" : "flat";
+  return (
+    <span className={`mood mood-${c} ${large ? "is-large" : ""}`}>
+      <Icon name={icon} size={large ? 20 : 14} />
+      {CONDITION_LABELS[String(c)]}
+    </span>
+  );
+}
+
+/** 円形のゲージ（疲労・仕上がり・健康など）。inverse は「少ないほど良い」 */
+export function Ring({ label, value, warnAt, dangerAt, inverse = false, note }: { label: string; value: number; warnAt: number; dangerAt: number; inverse?: boolean; note?: string }) {
+  const lvl = inverse ? (value >= dangerAt ? "bad" : value >= warnAt ? "warn" : "ok") : value < dangerAt ? "bad" : value < warnAt ? "warn" : "ok";
+  const word = lvl === "ok" ? "良好" : lvl === "warn" ? "注意" : "危険";
+  const r = 22;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className={`ring ring-${lvl}`} role="img" aria-label={`${label} ${value}（${word}）`}>
+      <svg viewBox="0 0 56 56" aria-hidden>
+        <circle cx="28" cy="28" r={r} className="ring-track" />
+        <circle cx="28" cy="28" r={r} className="ring-bar" strokeDasharray={`${(c * Math.max(0, Math.min(100, value))) / 100} ${c}`} transform="rotate(-90 28 28)" />
+        <text x="28" y="33" textAnchor="middle">
+          {value}
+        </text>
+      </svg>
+      <span className="ring-label">{label}</span>
+      <span className="ring-note">{note ?? word}</span>
+    </div>
+  );
+}
+
+/** 適性の短い表示（距離・馬場・脚質）。未検証は点線、未判明は「？」 */
+export function AptMark({ v, label }: { v: KnowledgeView; label: string }) {
+  const mark = v.stage === "abstract" && !v.mark ? "？" : v.mark ?? "？";
+  const cls = mark === "◎" ? "m-best" : mark === "○" ? "m-good" : mark === "△" ? "m-fair" : mark === "×" ? "m-bad" : "m-unknown";
+  return (
+    <span className={`aptm ${cls} ${v.unverified ? "is-unverified" : ""}`} title={`${v.label}：${v.unverified ? "未検証" : v.comment}`}>
+      <span>{label}</span>
+      <b>{mark}</b>
+    </span>
   );
 }
 

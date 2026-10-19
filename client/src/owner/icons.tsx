@@ -24,7 +24,10 @@ export type IconName =
   | "list"
   | "play"
   | "sound"
-  | "mute";
+  | "mute"
+  | "up"
+  | "down"
+  | "flat";
 
 const PATHS: Record<IconName, string> = {
   home: "M3 11 12 4l9 7M5 9.5V20h5v-6h4v6h5V9.5",
@@ -52,6 +55,9 @@ const PATHS: Record<IconName, string> = {
   play: "M7 4v16l13-8z",
   sound: "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11",
   mute: "M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6",
+  up: "M12 19V5M6 11l6-6 6 6",
+  down: "M12 5v14M6 13l6 6 6-6",
+  flat: "M5 12h14M13 6l6 6-6 6",
 };
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

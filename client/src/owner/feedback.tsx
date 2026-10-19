@@ -1,5 +1,6 @@
 // 共通の通知（ToastNotification）と確認ダイアログ（ConfirmActionDialog）
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Icon, type IconName } from "./icons";
 import { useUpdateBlocker } from "../pwa/hooks";
 
@@ -93,7 +94,7 @@ function useEscape(onClose: () => void) {
 export function ModalDialog({ title, onClose, children, labelledBy, wide }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string; wide?: boolean }) {
   useEscape(onClose);
   const id = labelledBy ?? "dialog-title";
-  return (
+  return createPortal(
     <div className="scrim" onClick={onClose}>
       <div className={`dialog ${wide ? "is-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id} onClick={(e) => e.stopPropagation()}>
         <h2 id={id} className="dialog-title">
@@ -101,14 +102,16 @@ export function ModalDialog({ title, onClose, children, labelledBy, wide }: { ti
         </h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 /** 下から出るシート。横向きの低い画面では右側から出るパネルになる（CSSで切り替え） */
 export function BottomSheet({ title, onClose, children, actions }: { title: string; onClose: () => void; children: ReactNode; actions?: ReactNode }) {
   useEscape(onClose);
-  return (
+  // 画面の重なり（牧場の景色の上の部品など）に関係なく、いちばん手前に出す
+  return createPortal(
     <div className="scrim scrim-sheet" onClick={onClose}>
       <section className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <header className="sheet-head">
@@ -120,7 +123,8 @@ export function BottomSheet({ title, onClose, children, actions }: { title: stri
         <div className="sheet-body">{children}</div>
         {actions && <footer className="sheet-actions">{actions}</footer>}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

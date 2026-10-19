@@ -15,9 +15,10 @@ import {
 import { ScreenHead } from "./AppShell";
 import { useOwner, type Route } from "./context";
 import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedback";
-import { Icon } from "./icons";
-import { ActionBar, HorseConditionBadge, StanceTag, StateMeters, trainerName, yen } from "./ui";
-import { classLabel, entryOptions, stakesAhead, type EntryVM } from "./vm";
+import { Icon, type IconName } from "./icons";
+import { ActionBar, HorseConditionBadge, Mood, StanceTag, StateMeters, trainerName, yen } from "./ui";
+import { classLabel, currentClassLabel, entryOptions, entryOverview, stakesAhead, type EntryVM } from "./vm";
+import { HorseFigure } from "./art";
 
 type RaceRoute = Extract<Route, { tab: "race" }>;
 
@@ -26,6 +27,134 @@ const PACE_DESC: Record<PacePlan, string> = { easy: "道中は抑えて脚をた
 const SPURT_DESC: Record<SpurtPlan, string> = { early: "最終コーナーの手前から動く", normal: "最終コーナーで動く", late: "直線に入ってから動く" };
 
 export function RaceEntry({ route }: { route: RaceRoute }) {
+  // 馬を選ぶ前は、全馬の出走予定表を出す
+  if (!route.horseId) return <EntryBoard />;
+  return <RaceEntryHorse route={route} />;
+}
+
+function fatigueWord(f: number): { word: string; lvl: "ok" | "warn" | "bad"; icon: IconName } {
+  if (f >= 70) return { word: "限界", lvl: "bad", icon: "alert" };
+  if (f >= 45) return { word: "疲れ気味", lvl: "warn", icon: "alert" };
+  if (f >= 20) return { word: "少し", lvl: "ok", icon: "info" };
+  return { word: "なし", lvl: "ok", icon: "check" };
+}
+
+/** 出走予定表：今週、どの馬をどのレースに出すかを一覧で決める */
+function EntryBoard() {
+  const { vm, save, nav } = useOwner();
+  const rows = useMemo(() => entryOverview(save, vm), [save, vm]);
+  const ready = rows.filter((r) => r.eligible > 0).length;
+  const open = (id: string) => nav.push({ tab: "race", horseId: id });
+  if (vm.horses.length === 0) {
+    return (
+      <div className="screen">
+        <ScreenHead title="出走予定表" />
+        <EmptyState icon="horse" title="現役の馬がいません" action={<button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>馬を買う</button>} />
+      </div>
+    );
+  }
+  return (
+    <div className="screen">
+      <ScreenHead title="出走予定表" sub={`${shortWeekLabel(save.week)}の番組／出走できる馬 ${ready}頭`} />
+      <div className="scroll board-scroll">
+        <table className="board">
+          <thead>
+            <tr>
+              <th scope="col">馬</th>
+              <th scope="col">体調</th>
+              <th scope="col">おすすめのレース</th>
+              <th scope="col">調教師</th>
+              <th scope="col">
+                <span className="sr-only">操作</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ horse: h, eligible, best, blocked }) => {
+              const f = fatigueWord(h.view.state.fatigue);
+              return (
+                <tr key={h.view.id} className={eligible ? "" : "is-off"} onClick={() => open(h.view.id)}>
+                  <td>
+                    <div className="board-horse">
+                      <span className="board-pic" aria-hidden>
+                        <HorseFigure horseId={h.view.id} shadow={false} />
+                      </span>
+                      <span className="board-name">
+                        <span className="horse-name">{h.view.name}</span>
+                        <small>
+                          {h.view.age}歳・{currentClassLabel(h.view)}
+                        </small>
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="board-cond">
+                      <Mood c={h.view.state.condition} />
+                      <span className={`fatigue f-${f.lvl}`}>
+                        <Icon name={f.icon} size={13} />
+                        疲労{f.word}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="board-race">
+                    {best ? (
+                      <>
+                        <span className="board-race-name">
+                          <strong>{best.program.name}</strong>
+                          <span className="pill">{classLabel(best.program)}</span>
+                          {best.program.named && <span className="pill pill-gold">重賞</span>}
+                          {eligible > 1 && <span className="board-more">ほか{eligible - 1}</span>}
+                        </span>
+                        <small>
+                          {best.program.course.trackName} {SURFACE_LABELS[best.program.course.surface]}
+                          {best.program.course.distance}m／1着 {yen(best.program.firstPrize)}
+                        </small>
+                      </>
+                    ) : (
+                      <small className="muted">{blocked}</small>
+                    )}
+                  </td>
+                  <td className="board-stance">{best?.opinion ? <StanceTag stance={best.opinion.stance} /> : <span className="muted">—</span>}</td>
+                  <td className="board-go">
+                    {eligible ? (
+                      <button
+                        className="btn btn-small btn-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          open(h.view.id);
+                        }}
+                      >
+                        検討する
+                      </button>
+                    ) : (
+                      <span className="board-state">今週は見送り</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="board-legend">
+          おすすめは調教師の意見がいちばん前向きなレースです。出走するレースと作戦は、次の画面で選びます。
+        </p>
+        <details className="stakes-ahead">
+          <summary>今後の重賞（開催時期）</summary>
+          <ul className="plain-list">
+            {stakesAhead(save).map(({ program: p, weeksAway }) => (
+              <li key={p.id}>
+                {shortWeekLabel(p.week)}（あと{weeksAway}週） <strong>{p.name}</strong> {SURFACE_LABELS[p.course.surface]}
+                {p.course.distance}m・{p.conditionText}
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+function RaceEntryHorse({ route }: { route: RaceRoute }) {
   const { vm, save, nav, startRace } = useOwner();
   const toast = useToast();
   const confirm = useConfirm();

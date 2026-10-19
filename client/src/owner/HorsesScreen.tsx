@@ -1,6 +1,7 @@
 // 所有馬：一覧（横向きでは選択中の馬の概要を横に表示）と、馬の詳細（6タブ）
 import { useState } from "react";
 import {
+  ABILITY_KEYS,
   DISTANCE_BANDS,
   GOING_LABELS,
   SURFACE_LABELS,
@@ -21,9 +22,12 @@ import { Icon } from "./icons";
 import {
   AbilityDiscoveryPanel,
   ActionBar,
+  AptMark,
   AptitudeCell,
   HorseConditionBadge,
   HorseSummaryCard,
+  Mood,
+  Ring,
   Pane,
   StableReportCard,
   StateMeters,
@@ -32,7 +36,8 @@ import {
   trainerName,
   yen,
 } from "./ui";
-import { economyOf, type HorseCardVM, type ReportVM } from "./vm";
+import { currentClassLabel, economyOf, type HorseCardVM, type ReportVM } from "./vm";
+import { COAT_LABELS, HorseFigure, coatOf } from "./art";
 
 type HorsesRoute = Extract<Route, { tab: "horses" }>;
 
@@ -43,7 +48,6 @@ export function HorsesScreen({ route }: { route: HorsesRoute }) {
 
 function HorseList({ selectedId }: { selectedId?: string }) {
   const { vm, nav } = useOwner();
-  const sel = vm.horses.find((h) => h.view.id === selectedId) ?? vm.horses[0];
   const retired = vm.allHorses.filter((h) => h.status !== "active");
   const open = (id: string) => nav.push({ tab: "horses", horseId: id, detail: true, horseTab: "overview" });
   return (
@@ -63,52 +67,16 @@ function HorseList({ selectedId }: { selectedId?: string }) {
           販売馬を買って厩舎に預けましょう。
         </EmptyState>
       ) : (
-        <div className="split">
-          <div className="split-main scroll">
-            <ul className="horse-grid2">
-              {vm.horses.map((h) => (
-                <li key={h.view.id}>
-                  <HorseSummaryCard
-                    h={h}
-                    selected={h === sel}
-                    onOpen={() => {
-                      // 横向き（横に概要がある）では選択、縦向きでは詳細へ
-                      if (window.matchMedia("(min-width: 700px)").matches && h !== sel) nav.replace({ tab: "horses", horseId: h.view.id });
-                      else open(h.view.id);
-                    }}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-          {sel && (
-            <aside className="split-side scroll" aria-label="選択中の馬">
-              <HorseBrief h={sel} />
-              <button className="btn btn-primary btn-block" onClick={() => open(sel.view.id)}>
-                {sel.view.name}の詳細
-              </button>
-            </aside>
-          )}
+        <div className="scroll horse-scroll">
+          <ul className="horse-grid3">
+            {vm.horses.map((h) => (
+              <li key={h.view.id}>
+                <HorseSummaryCard h={h} selected={h.view.id === selectedId} onOpen={() => open(h.view.id)} />
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </div>
-  );
-}
-
-function HorseBrief({ h }: { h: HorseCardVM }) {
-  const v = h.view;
-  return (
-    <div className="brief">
-      <p className="horse-name lg">{v.name}</p>
-      <p className="muted">
-        {v.age}歳／{h.trainerName}厩舎／{v.record.races}戦{v.record.wins}勝
-      </p>
-      <HorseConditionBadge c={h.condition} />
-      <StateMeters s={v.state} compact />
-      <p className="brief-plan">
-        <Icon name="clock" size={15} />
-        {h.nextPlan}
-      </p>
     </div>
   );
 }
@@ -158,54 +126,145 @@ function HorseDetail({ horseId, tab }: { horseId: string; tab: HorseTab }) {
   );
 }
 
+const DIST_SHORT: [KnowledgeKey, string][] = [
+  ["dist_sprint", "短"],
+  ["dist_mile", "マ"],
+  ["dist_middle", "中"],
+  ["dist_long", "長"],
+];
+const GROUND_SHORT: [KnowledgeKey, string][] = [
+  ["surface_turf", "芝"],
+  ["surface_dirt", "ダ"],
+  ["going_heavy", "重"],
+];
+const STYLE_SHORT: [KnowledgeKey, string][] = [
+  ["style_front", "逃"],
+  ["style_stalker", "先"],
+  ["style_closer", "差"],
+  ["style_deep", "追"],
+];
+
+/** 概要：馬の名鑑（プロフィール｜姿｜状態） */
 function Overview({ v, card }: { v: HorseView; card?: HorseCardVM }) {
-  const recent = [...v.knowledgeEvents].reverse().slice(0, 4);
+  const { nav } = useOwner();
+  const last = [...v.knowledgeEvents].reverse()[0];
+  const s = v.state;
   return (
-    <div className="cols">
-      <Pane title="この馬について">
-        <dl className="facts">
-          <div>
-            <dt>血統</dt>
-            <dd>
-              父 {v.sireName ?? "—"}／母 {v.damName ?? "—"}
-            </dd>
-          </div>
-          <div>
-            <dt>預託先</dt>
-            <dd>{trainerName(v.trainerId)}厩舎</dd>
-          </div>
+    <div className="dossier">
+      <section className="dossier-card dossier-profile" aria-label="プロフィール">
+        <div className="class-plaque">
+          <Laurel />
+          <span>{currentClassLabel(v)}</span>
+          <Laurel flip />
+        </div>
+        <dl className="dossier-facts">
           <div>
             <dt>戦績</dt>
-            <dd>
-              {v.record.races}戦{v.record.wins}勝（2着{v.record.seconds}・3着{v.record.thirds}）
+            <dd title={`2着${v.record.seconds}回・3着${v.record.thirds}回`}>
+              <strong>
+                {v.record.races}戦{v.record.wins}勝
+              </strong>
+              {v.record.races > 0 && (
+                <small>
+                  {" "}
+                  {v.record.seconds + v.record.thirds > 0 ? `（2・3着 ${v.record.seconds + v.record.thirds}回）` : ""}
+                </small>
+              )}
             </dd>
           </div>
           <div>
             <dt>獲得賞金</dt>
             <dd className="gold-num">{yen(v.record.totalPrize)}</dd>
           </div>
-          {card && (
-            <div>
-              <dt>次の予定</dt>
-              <dd>{card.nextPlan}</dd>
-            </div>
-          )}
         </dl>
-        <h3 className="settings-sub">個性</h3>
-        <TraitChips traits={v.traits} />
-      </Pane>
-      <Pane title="最近わかったこと">
-        {recent.length === 0 ? (
-          <p className="muted">まだ判明したことはありません。</p>
-        ) : (
-          <ul className="event-list">
-            {recent.map((e, i) => (
-              <EventRow key={i} e={e} />
-            ))}
-          </ul>
+        <span className="status-k">能力の見立て</span>
+        <div className="abil-mini" aria-label="能力の見立て">
+          {ABILITY_KEYS.map((k) => {
+            const kv = v.knowledge[k];
+            return (
+              <span key={k} className={`abil-cell stage-${kv.stage}`} title={kv.comment}>
+                <span>{kv.label}</span>
+                <b>{kv.stage === "numeric" ? kv.value : kv.rank ?? "？"}</b>
+              </span>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="dossier-portrait" aria-label="馬の姿">
+        <div className="portrait-stage">
+          <HorseFigure horseId={v.id} />
+        </div>
+        <div className="nameplate">
+          <span className="horse-name">{v.name}</span>
+          <span>
+            {v.age}歳・{COAT_LABELS[coatOf(v.id)]}・{trainerName(v.trainerId)}厩舎
+          </span>
+          <span className="nameplate-blood">
+            父 {v.sireName ?? "—"}／母 {v.damName ?? "—"}
+          </span>
+        </div>
+        {last && (
+          <button className="portrait-news" onClick={() => nav.replace({ tab: "horses", horseId: v.id, detail: true, horseTab: "ability" })}>
+            <Icon name={last.type === "revise" ? "info" : "spark"} size={14} />
+            <span>{last.text}</span>
+          </button>
         )}
-      </Pane>
+      </section>
+
+      <section className="dossier-card dossier-status" aria-label="状態">
+        <div className="status-mood">
+          <span className="status-k">調子</span>
+          <Mood c={s.condition} large />
+        </div>
+        <div className="rings">
+          <Ring label="疲労" value={s.fatigue} warnAt={45} dangerAt={70} inverse note={s.fatigue < 20 ? "なし" : undefined} />
+          <Ring label="仕上がり" value={s.fitness} warnAt={60} dangerAt={35} />
+          <Ring label="健康" value={s.health} warnAt={60} dangerAt={40} />
+        </div>
+        <div className="trust">
+          <span className="status-k">厩舎との信頼</span>
+          <span className="trust-bar" aria-hidden>
+            <span style={{ width: `${Math.round(v.relationship)}%` }} />
+          </span>
+          <span className="trust-num">{Math.round(v.relationship)}</span>
+        </div>
+        <div className="apt-strip" aria-label="適性">
+          {(
+            [
+              ["距離", DIST_SHORT],
+              ["馬場", GROUND_SHORT],
+              ["脚質", STYLE_SHORT],
+            ] as const
+          ).map(([g, keys]) => (
+            <div key={g} className="apt-strip-row">
+              <span className="apt-strip-label">{g}</span>
+              <span className="apt-strip-marks">
+                {keys.map(([k, l]) => (
+                  <AptMark key={k} v={v.knowledge[k]} label={l} />
+                ))}
+              </span>
+            </div>
+          ))}
+          <p className="apt-legend">◎よく合う ○合う △いまひとつ ×苦手 ？まだ分からない（点線は未検証）</p>
+        </div>
+      </section>
     </div>
+  );
+}
+
+/** 月桂樹の小枝（クラス表示の飾り。本作独自の簡単な図形） */
+function Laurel({ flip }: { flip?: boolean }) {
+  return (
+    <svg className="laurel" viewBox="0 0 28 40" width="16" height="24" aria-hidden style={flip ? { transform: "scaleX(-1)" } : undefined}>
+      <path d="M22 38 C10 30 6 18 10 4" stroke="currentColor" strokeWidth="1.6" fill="none" />
+      {[8, 15, 22, 29].map((y, i) => (
+        <g key={y}>
+          <ellipse cx={11 - i * 0.6} cy={y} rx="5" ry="2.2" transform={`rotate(-35 ${11 - i * 0.6} ${y})`} fill="currentColor" />
+          <ellipse cx={17 - i * 0.2} cy={y + 3} rx="5" ry="2.2" transform={`rotate(30 ${17 - i * 0.2} ${y + 3})`} fill="currentColor" opacity="0.85" />
+        </g>
+      ))}
+    </svg>
   );
 }
 

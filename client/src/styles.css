@@ -1229,3 +1229,10 @@ select {
     transition: none !important;
   }
 }
+
+/* 文字入力の欄は 16px 以上にする（iOS は 16px 未満の欄にフォーカスすると画面を拡大し、元に戻らない） */
+input:not([type="range"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+select,
+textarea {
+  font-size: max(16px, 1em) !important;
+}

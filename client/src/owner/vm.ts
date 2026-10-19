@@ -238,6 +238,35 @@ export function entryOptions(save: OwnerSave, horseId: string): EntryVM[] {
   });
 }
 
+/** 出走予定表の1行：その馬の今週の候補と、いちばん勧められるレース */
+export interface EntryOverviewRow {
+  horse: HorseCardVM;
+  eligible: number;
+  best: EntryVM | null;
+  /** 出られない理由（出られるレースがないとき） */
+  blocked: string | null;
+}
+
+const STANCE_RANK: Record<TrainerOpinion["stance"], number> = { 推奨: 0, 賛成: 1, 慎重: 2, 反対: 3 };
+
+export function entryOverview(save: OwnerSave, vm: OwnerVM): EntryOverviewRow[] {
+  return vm.horses.map((h) => {
+    const opts = entryOptions(save, h.view.id);
+    const ok = opts.filter((o) => !o.problem && o.opinion);
+    const best = [...ok].sort((a, b) => STANCE_RANK[a.opinion!.stance] - STANCE_RANK[b.opinion!.stance] || b.program.firstPrize - a.program.firstPrize)[0] ?? null;
+    return { horse: h, eligible: ok.length, best, blocked: ok.length ? null : (opts.find((o) => o.problem)?.problem ?? "今週はレースがありません") };
+  });
+}
+
+/** 今いるクラス（勝ち数から。出走条件と同じ区分） */
+export function currentClassLabel(v: HorseView): string {
+  if (v.record.races === 0) return "新馬";
+  if (v.record.wins === 0) return "未勝利";
+  if (v.record.wins === 1) return "1勝クラス";
+  if (v.record.wins === 2) return "2勝クラス";
+  return "オープン";
+}
+
 export function classLabel(p: OwnerProgram): string {
   return CLASS_DEFS[p.classId].label;
 }

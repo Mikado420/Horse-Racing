@@ -5,6 +5,7 @@ import { weekLabel, shortWeekLabel } from "@owners/shared";
 import { Icon, type IconName } from "./icons";
 import { tabOf, type Nav, type NavTab } from "./context";
 import { yen } from "./ui";
+import { SEASON_LABELS, SeasonIcon, seasonOf } from "./art";
 import { requestApply, useUpdateState } from "../pwa/update";
 import { blockerLabel } from "../pwa/policy";
 
@@ -39,6 +40,7 @@ export function AppShell({ nav, status, onNotices, onSettings, badges, children 
 }
 
 export function TopStatusBar({ s, onNotices, onSettings }: { s: StatusInfo; onNotices: () => void; onSettings: () => void }) {
+  const season = seasonOf(s.week);
   const saved = s.saveError ? "保存できません" : s.savedAt ? `保存済み ${new Date(s.savedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}` : "保存済み";
   return (
     <header className="topbar2">
@@ -48,14 +50,14 @@ export function TopStatusBar({ s, onNotices, onSettings }: { s: StatusInfo; onNo
         </span>
         <span className="brand-name">オーナーズ</span>
       </span>
-      <span className="status-week" title={weekLabel(s.week)}>
-        <Icon name="clock" size={16} />
-        <span className="long">{weekLabel(s.week)}</span>
-        <span className="short">{shortWeekLabel(s.week)}</span>
-      </span>
-      <span className={`status-money ${s.money < 0 ? "is-minus" : ""}`}>
+      <span className={`status-money ${s.money < 0 ? "is-minus" : ""}`} title="所持金">
         <Icon name="coin" size={16} />
         {yen(s.money)}
+      </span>
+      <span className={`status-week season-${season}`} title={`${weekLabel(s.week)}（${SEASON_LABELS[season]}）`}>
+        <SeasonIcon season={season} size={15} />
+        <span className="long">{weekLabel(s.week)}</span>
+        <span className="short">{shortWeekLabel(s.week)}</span>
       </span>
       <span className={`status-save ${s.saveError ? "is-error" : ""}`} title={saved}>
         <Icon name={s.saveError ? "alert" : "save"} size={16} />

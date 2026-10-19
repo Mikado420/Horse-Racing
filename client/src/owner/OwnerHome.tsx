@@ -1,14 +1,15 @@
 // 馬主ホーム「オーナーズ・デスク」：今週の判断 → 注目馬 → 厩舎報告 → 週送り
-import { useState } from "react";
-import { ABILITY_KEYS, POLICY_DEFS, findProgramById, weekLabel, type WeeklyReport } from "@owners/shared";
+import { useState, type CSSProperties } from "react";
+import { findProgramById, type WeeklyReport } from "@owners/shared";
 import { useOwner } from "./context";
 import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedback";
+import { HorseFigure, PastureScene, SEASON_LABELS, seasonOf, type HorsePose } from "./art";
 import { Icon } from "./icons";
 import { ReportSheet } from "./actions";
-import { ActionBar, HorseConditionBadge, ImportanceTag, Pane, StableReportCard, StateMeters, yen, yenSigned } from "./ui";
+import { ImportanceTag, trainerName, yen, yenSigned } from "./ui";
 import { todos, type TodoItem, type ReportVM } from "./vm";
 
-export function TodoList({ items, onAct }: { items: TodoItem[]; onAct?: () => void }) {
+export function TodoList({ items, onAct, variant = "list" }: { items: TodoItem[]; onAct?: () => void; variant?: "list" | "cards" }) {
   const { nav, vm } = useOwner();
   const [report, setReport] = useState<ReportVM | null>(null);
   if (items.length === 0) {
@@ -30,6 +31,29 @@ export function TodoList({ items, onAct }: { items: TodoItem[]; onAct?: () => vo
     else if (a.to === "analysis") nav.push({ tab: "records", sub: "analysis", raceId: a.arg });
     else if (a.to === "shop") nav.push({ tab: "shop" });
   };
+  if (variant === "cards")
+    return (
+      <>
+        <ul className="todo-cards">
+          {items.map((t) => (
+            <li key={t.id}>
+              <button className={`todo-card lv-${t.importance}`} onClick={() => act(t)}>
+                <span className="todo-card-tag">
+                  <ImportanceTag level={t.importance} />
+                </span>
+                <strong className="todo-card-title">{t.title}</strong>
+                <span className="todo-card-detail">{t.detail}</span>
+                <span className="todo-card-go">
+                  {t.action.label}
+                  <Icon name="next" size={14} />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {report && <ReportSheet r={report} onClose={() => setReport(null)} />}
+      </>
+    );
   return (
     <>
       <ul className="todos">
@@ -58,19 +82,29 @@ interface WeekSummary {
   notices: string[];
 }
 
+/** 牧場に並べる位置（x：左右 0〜1、y：足元の高さ %、s：大きさ）。手前ほど大きい */
+const SPOTS: { x: number; y: number; yp: number; s: number; pose: HorsePose; flip: boolean }[] = [
+  { x: 0.42, y: 77, yp: 90, s: 1, pose: "stand", flip: false },
+  { x: 0.84, y: 67, yp: 60, s: 0.8, pose: "graze", flip: true },
+  { x: 0.1, y: 69, yp: 62, s: 0.8, pose: "graze", flip: false },
+  { x: 0.66, y: 81, yp: 98, s: 1.04, pose: "stand", flip: true },
+  { x: 0.98, y: 79, yp: 76, s: 0.92, pose: "stand", flip: true },
+  { x: 0.2, y: 83, yp: 99, s: 1.02, pose: "graze", flip: false },
+];
+
 export function OwnerHome() {
   const { game, vm, save, nav, markRead, sound } = useOwner();
   const toast = useToast();
   const confirm = useConfirm();
   const { busy, run } = useBusy();
-  const [panel, setPanel] = useState<"horse" | "reports">("horse");
-  const [featuredId, setFeaturedId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportVM | null>(null);
   const [summary, setSummary] = useState<WeekSummary | null>(null);
   const items = todos(save, vm);
-  const featured = vm.horses.find((h) => h.view.id === featuredId) ?? vm.horses[0];
+  const season = seasonOf(save.week);
   const unread = vm.reports.filter((r) => r.unread);
-  const recent = vm.reports.slice(0, 12);
+  const latest = [...vm.reports].sort((a, b) => b.report.week - a.report.week)[0];
+  const placed = vm.horses.slice(0, SPOTS.length).map((h, i) => ({ h, spot: SPOTS[i] }));
+  const more = vm.horses.length - placed.length;
 
   const advance = (weeks: number) =>
     run(async () => {
@@ -86,9 +120,7 @@ export function OwnerHome() {
         const after = r.save.player.money;
         const res: WeekSummary = { weeks: Math.max(1, new Set(r.reports.map((x) => x.week)).size), moneyDelta: after - before, reports: r.reports, notices: r.notices };
         setSummary(res);
-        const found = r.reports.reduce((a, x) => a + x.discoveries.length, 0);
         if (r.reports.some((x) => x.alerts.length)) sound("report");
-        toast(found ? `${res.weeks}週進めました。新しい能力情報が${found}件あります` : `${res.weeks}週進めました`, found ? "good" : "info");
       } catch (e) {
         toast((e as Error).message, "error");
       }
@@ -98,123 +130,83 @@ export function OwnerHome() {
     setReport(r);
     markRead([r.id]);
   };
+  const openHorse = (id: string) => nav.push({ tab: "horses", horseId: id, detail: true, horseTab: "overview" });
 
   return (
-    <div className="screen desk">
-      <div className="desk-grid">
-        <Pane title="今週の判断" className="desk-todo" aside={<span className="pane-note">{weekLabel(save.week)}</span>}>
-          <TodoList items={items} />
-        </Pane>
-
-        <section className="pane desk-right">
-          <header className="pane-head">
-            <div className="seg2 pane-switch" role="tablist" aria-label="表示の切り替え">
-              <button role="tab" aria-selected={panel === "horse"} onClick={() => setPanel("horse")}>
-                <Icon name="horse" size={16} />
-                注目馬
-              </button>
-              <button role="tab" aria-selected={panel === "reports"} onClick={() => setPanel("reports")}>
-                <Icon name="report" size={16} />
-                厩舎報告{unread.length > 0 && <span className="count">{unread.length}</span>}
-              </button>
-            </div>
-          </header>
-          <div className="pane-body desk-panels" data-panel={panel}>
-            <div className="desk-horse">
-              {!featured ? (
-                <EmptyState icon="horse" title="現役の馬がいません" action={<button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>馬を買う</button>} />
-              ) : (
-                <>
-                  {vm.horses.length > 1 && (
-                    <div className="chip-row" role="radiogroup" aria-label="注目馬">
-                      {vm.horses.map((h) => (
-                        <button key={h.view.id} role="radio" aria-checked={h === featured} className="chip" onClick={() => setFeaturedId(h.view.id)}>
-                          {h.view.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="featured">
-                    <div className="featured-head">
-                      <span className="horse-name lg">{featured.view.name}</span>
-                      <span className="pill">{featured.view.age}歳</span>
-                      <HorseConditionBadge c={featured.condition} />
-                    </div>
-                    <p className="featured-sub">
-                      {featured.trainerName}厩舎／方針「{POLICY_DEFS[featured.view.policy.policy].label}」
-                    </p>
-                    <p className="featured-plan">
-                      <Icon name="clock" size={15} />
-                      {featured.nextPlan}
-                    </p>
-                    <StateMeters s={featured.view.state} compact />
-                    <div className="known-row">
-                      {ABILITY_KEYS.map((k) => {
-                        const kv = featured.view.knowledge[k];
-                        return (
-                          <span key={k} className={`known stage-${kv.stage}`}>
-                            <span>{kv.label}</span>
-                            <b>{kv.stage === "numeric" ? kv.value : kv.rank ?? "？"}</b>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <div className="btn-row">
-                      <button className="btn btn-ghost" onClick={() => nav.push({ tab: "horses", horseId: featured.view.id, detail: true, horseTab: "overview" })}>
-                        詳細を見る
-                      </button>
-                      {featured.runnable > 0 && (
-                        <button className="btn btn-primary" onClick={() => nav.push({ tab: "race", horseId: featured.view.id })}>
-                          出走を検討
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="desk-reports">
-              {recent.length === 0 ? (
-                <EmptyState icon="report" title="まだ報告はありません">週を進めると、預けた厩舎から調教の内容と馬の様子が届きます。</EmptyState>
-              ) : (
-                <>
-                  {unread.length > 1 && (
-                    <button className="link2" onClick={() => markRead(unread.map((r) => r.id))}>
-                      すべて確認済みにする
-                    </button>
-                  )}
-                  <ul className="report-list">
-                    {recent.map((r) => (
-                      <li key={r.id}>
-                        <StableReportCard r={r} onOpen={() => openReport(r)} />
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
+    <div className="screen home3" data-season={season}>
+      <section className="home-scene" aria-label={`牧場（${SEASON_LABELS[season]}）`}>
+        <PastureScene season={season} />
+        <p className="home-meta">
+          <span>
+            <Icon name="horse" size={14} />
+            現役 {vm.horses.length}頭
+          </span>
+          <span>
+            預託料 <strong>{yen(vm.fees)}</strong>／週
+          </span>
+        </p>
+        {vm.horses.length === 0 ? (
+          <div className="home-empty">
+            <p>牧場に馬がいません</p>
+            <button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>
+              <Icon name="cart" />
+              馬を買う
+            </button>
           </div>
-        </section>
-      </div>
+        ) : (
+          <ul className="paddock" aria-label="所有馬">
+            {placed.map(({ h, spot }) => (
+              <li
+                key={h.view.id}
+                className="paddock-spot"
+                style={{ "--x": spot.x, "--y": `${spot.y}%`, "--yp": `${spot.yp}%`, "--s": spot.s, zIndex: Math.round(spot.y) } as CSSProperties}
+              >
+                <button className="paddock-horse" onClick={() => openHorse(h.view.id)} aria-label={`${h.view.name}（${h.condition.label}）の詳細`}>
+                  <span className={`paddock-tag tag-${h.condition.level}`}>
+                    <span className="paddock-name">{h.view.name}</span>
+                    {h.unreadReports > 0 && (
+                      <span className="paddock-rep" title={`未確認の報告 ${h.unreadReports}件`}>
+                        <Icon name="report" size={12} />
+                        {h.unreadReports}
+                      </span>
+                    )}
+                  </span>
+                  <HorseFigure horseId={h.view.id} pose={spot.pose} flip={spot.flip} />
+                </button>
+              </li>
+            ))}
+            {more > 0 && (
+              <li className="paddock-more">
+                <button className="link2" onClick={() => nav.switchTab("horses")}>
+                  ほか{more}頭
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+        <TrainerVoice latest={latest} unread={unread.length} onOpen={openReport} onAll={() => nav.switchTab("stable")} />
+      </section>
 
-      <ActionBar
-        info={
-          <>
-            <span>
-              預託料 <strong>{yen(vm.fees)}</strong>／週
-            </span>
-            <span className="hide-xs">現役 {vm.horses.length}頭</span>
-          </>
-        }
-      >
-        <button className="btn btn-ghost" disabled={busy || vm.horses.length === 0} onClick={() => advance(4)}>
-          4週進める
+      <aside className="home-todo" aria-label="今週の判断">
+        <header className="home-todo-head">
+          <h2>今週の判断</h2>
+          <span>{items.length ? `${items.length}件` : ""}</span>
+        </header>
+        <div className="home-todo-body scroll">
+          <TodoList items={items} variant="cards" />
+        </div>
+      </aside>
+
+      <div className="home-next">
+        <button className="btn-next4" disabled={busy || vm.horses.length === 0} onClick={() => advance(4)}>
+          4週
+          <small>まとめて</small>
         </button>
-        <button className="btn btn-primary btn-week" disabled={busy || vm.horses.length === 0} onClick={() => advance(1)} aria-busy={busy}>
-          {busy ? <span className="spinner sm" aria-hidden /> : <Icon name="next" />}
-          1週進める
+        <button className="btn-next" disabled={busy || vm.horses.length === 0} onClick={() => advance(1)} aria-busy={busy} aria-label="1週進める">
+          {busy ? <span className="spinner" aria-hidden /> : <Icon name="next" size={26} />}
+          <span className="btn-next-label">次の週へ</span>
         </button>
-      </ActionBar>
+      </div>
 
       {report && <ReportSheet r={report} onClose={() => setReport(null)} />}
       {summary && (
@@ -227,7 +219,7 @@ export function OwnerHome() {
                 className="btn btn-ghost"
                 onClick={() => {
                   setSummary(null);
-                  setPanel("reports");
+                  nav.switchTab("stable");
                 }}
               >
                 報告を読む
@@ -240,6 +232,42 @@ export function OwnerHome() {
         >
           <WeekResult s={summary} />
         </BottomSheet>
+      )}
+    </div>
+  );
+}
+
+/** 調教師のひとこと：いちばん新しい報告を吹き出しで */
+function TrainerVoice({ latest, unread, onOpen, onAll }: { latest?: ReportVM; unread: number; onOpen: (r: ReportVM) => void; onAll: () => void }) {
+  if (!latest)
+    return (
+      <div className="voice is-empty">
+        <span className="voice-crest" aria-hidden>
+          <Icon name="stable" size={18} />
+        </span>
+        <p className="voice-text">週を進めると、預けた厩舎から調教の様子が届きます。</p>
+      </div>
+    );
+  const name = trainerName(latest.report.trainerId);
+  return (
+    <div className={`voice lv-${latest.importance}`}>
+      <button className="voice-main" onClick={() => onOpen(latest)}>
+        <span className="voice-crest" aria-hidden>
+          {name.slice(0, 1)}
+        </span>
+        <span className="voice-body">
+          <span className="voice-who">
+            {name}調教師
+            <span className="voice-horse">{latest.report.horseName}</span>
+            {latest.unread && <span className="unread-dot" aria-label="未確認" />}
+          </span>
+          <span className="voice-text">「{latest.summary}」</span>
+        </span>
+      </button>
+      {unread > 1 && (
+        <button className="voice-more" onClick={onAll}>
+          未確認 {unread}件
+        </button>
       )}
     </div>
   );
