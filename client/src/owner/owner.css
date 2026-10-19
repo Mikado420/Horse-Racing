@@ -3048,3 +3048,14 @@ button.offer2 {
   gap: 0.2rem;
   margin: 0 0 1rem;
 }
+
+/* 狭い縦画面：上部バーの余白を詰め、保存表示（エラー時以外）を省いて、更新・お知らせ・設定が必ず収まるようにする */
+@media (max-width: 430px) {
+  .topbar2 { gap: 0.4rem; }
+  .topbar2 .status-btn { padding: 0 0.45rem; }
+  .status-week { font-size: 0.85rem; }
+}
+@media (max-width: 380px) {
+  .status-save:not(.is-error) { display: none; }
+  .status-money { font-size: 0.98rem; }
+}
