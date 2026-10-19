@@ -2989,6 +2989,29 @@ button.offer2 {
   border-color: var(--c-gold);
   color: #f6e2b0;
 }
+/* 更新ボタンはアイコンだけだと何のボタンか分からないので、狭い画面でも文字を出す */
+.status-btn.is-update .status-btn-label {
+  display: inline;
+  white-space: nowrap;
+}
+.status-btn-short {
+  display: none;
+  white-space: nowrap;
+}
+@media (max-width: 430px) {
+  .status-btn.is-update .status-btn-label {
+    display: none;
+  }
+  .status-btn.is-update .status-btn-short {
+    display: inline;
+  }
+}
+/* さらに狭いときはアイコンだけ（準備ができたことはお知らせで伝える） */
+@media (max-width: 380px) {
+  .status-btn.is-update .status-btn-short {
+    display: none;
+  }
+}
 .update-pill {
   position: fixed;
   z-index: 70;

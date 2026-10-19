@@ -20,7 +20,7 @@ import { RaceViewer } from "./RaceViewer";
 import { SettingsPanel } from "./SettingsPanel";
 import { TodoList } from "./OwnerHome";
 import { useToast } from "./feedback";
-import { APP_VERSION, takeUpdatedFlag } from "../pwa/update";
+import { APP_VERSION, takeUpdatedFlag, useUpdateState } from "../pwa/update";
 
 const TAB_ROOT: Record<NavTab, Route> = {
   home: { tab: "home" },
@@ -111,6 +111,15 @@ function OwnerInner({
     const from = takeUpdatedFlag();
     if (from && game.save && !game.loadError) toast(`新しいバージョン（${APP_VERSION}）に更新しました。セーブデータはそのままです`, "good");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 新しいバージョンの準備ができたら一度だけ知らせる（切り替えは上部の更新ボタンか、安全なときに自動で）
+  const upd = useUpdateState();
+  const watching = upd.blockers.some((b) => b.startsWith("race"));
+  const toldReady = useRef(false);
+  useEffect(() => {
+    if (upd.status !== "ready" || watching || toldReady.current) return;
+    toldReady.current = true;
+    toast("新しいバージョンの準備ができました。上部の更新ボタンで切り替えられます（セーブデータはそのまま）", "info");
+  }, [upd.status, watching]); // eslint-disable-line react-hooks/exhaustive-deps
   // ほかのタブで保存された内容を読み込んだら知らせる
   const syncs = game.externalSyncs;
   useEffect(() => {

@@ -91,6 +91,7 @@ function UpdateButton() {
     >
       <Icon name="spark" />
       <span className="status-btn-label">{label}</span>
+      <span className="status-btn-short" aria-hidden>{u.status === "applying" ? "更新中" : waiting ? "待機" : "更新"}</span>
     </button>
   );
 }
