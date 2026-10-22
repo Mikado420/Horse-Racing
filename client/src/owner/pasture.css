@@ -1405,3 +1405,38 @@
     justify-items: end;
   }
 }
+
+/* =========================================================
+   レース観戦の3D表示
+   ========================================================= */
+.race-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #9fc3dc 0%, #d6e6ef 55%, #6f9a52 55%, #5e8a46 100%);
+}
+.race-scene .race-canvas {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  touch-action: none;
+}
+.race-scene-note {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 80%;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(13, 31, 24, 0.72);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+}

@@ -3,15 +3,10 @@
 import { useId } from "react";
 import { monthOf } from "@owners/shared";
 
-import { COATS, coatOf } from "./coat";
+import { COATS, blazeOf, coatOf } from "./coat";
 export { COAT_LABELS, coatOf, type CoatId } from "./coat";
 
 /** 顔の白斑（流星など）があるか。これも見た目だけ */
-function blazeOf(horseId: string): boolean {
-  let h = 7;
-  for (let i = 0; i < horseId.length; i++) h = (h * 31 + horseId.charCodeAt(i)) >>> 0;
-  return h % 3 === 0;
-}
 
 /* ---------------- 馬の姿 ---------------- */
 

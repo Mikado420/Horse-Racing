@@ -19,6 +19,7 @@ import { Icon, type IconName } from "./icons";
 import { ActionBar, HorseConditionBadge, Mood, StanceTag, StateMeters, trainerName, yen } from "./ui";
 import { classLabel, currentClassLabel, entryOptions, entryOverview, stakesAhead, type EntryVM } from "./vm";
 import { HorseFigure } from "./art";
+import { preloadRaceAssets } from "../three/model/assets";
 
 type RaceRoute = Extract<Route, { tab: "race" }>;
 
@@ -27,6 +28,8 @@ const PACE_DESC: Record<PacePlan, string> = { easy: "道中は抑えて脚をた
 const SPURT_DESC: Record<SpurtPlan, string> = { early: "最終コーナーの手前から動く", normal: "最終コーナーで動く", late: "直線に入ってから動く" };
 
 export function RaceEntry({ route }: { route: RaceRoute }) {
+  // 観戦に備えて、馬と騎手の3Dモデルを裏で用意しておく
+  useEffect(() => preloadRaceAssets(), []);
   // 馬を選ぶ前は、全馬の出走予定表を出す
   if (!route.horseId) return <EntryBoard />;
   return <RaceEntryHorse route={route} />;

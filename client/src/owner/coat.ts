@@ -26,3 +26,10 @@ export function coatOf(horseId: string): CoatId {
   return COAT_ORDER[(h >>> 0) % COAT_ORDER.length];
 }
 
+
+/** 顔の白斑（流星など）があるか。これも見た目だけ */
+export function blazeOf(horseId: string): boolean {
+  let h = 7;
+  for (let i = 0; i < horseId.length; i++) h = (h * 31 + horseId.charCodeAt(i)) >>> 0;
+  return h % 3 === 0;
+}
