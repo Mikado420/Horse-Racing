@@ -1,0 +1,104 @@
+/* UI v4：競馬場の案内板 × 競馬新聞 × 馬主の執務室。既存のスタイルの上に、統一のための規則を足す */
+
+/* ---- 広い画面だけ／狭い画面だけ ---- */
+@media (max-width: 959px) {
+  .only-wide {
+    display: none !important;
+  }
+}
+@media (min-width: 960px) {
+  .only-narrow {
+    display: none !important;
+  }
+}
+
+/* ---- 表（馬柱・番組表・結果表に共通） ---- */
+.horse-table,
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px double var(--ink);
+  font-size: 0.92rem;
+}
+.horse-table th,
+.horse-table td,
+.paper-table th,
+.paper-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.horse-table thead th,
+.paper-table thead th {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+  white-space: nowrap;
+}
+.horse-table td small,
+.paper-table td small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
+.horse-table tbody tr {
+  cursor: pointer;
+}
+.horse-table tbody tr:hover,
+.horse-table tbody tr.is-selected {
+  background: #f7f5ee;
+}
+.ht-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.ht-name strong {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  display: block;
+}
+.ht-fig {
+  width: 56px;
+  height: 42px;
+  flex: none;
+}
+.ht-fig svg {
+  width: 100%;
+  height: 100%;
+}
+.ht-rep {
+  display: block;
+  color: var(--turf);
+  font-size: 0.76rem;
+}
+.horse-scroll .horse-table {
+  margin-bottom: 12px;
+}
+
+/* ---- 馬の詳細（縦向き）：要点を先に、姿は小さく後ろに ---- */
+@media (max-width: 699px), (orientation: portrait) and (max-width: 900px) {
+  .dossier > .dossier-portrait {
+    order: 3;
+    min-height: 170px;
+  }
+  .dossier > .dossier-profile {
+    order: 1;
+  }
+  .dossier > .dossier-status {
+    order: 2;
+  }
+}

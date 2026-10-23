@@ -4,6 +4,9 @@
 import {
   ABILITY_KEYS,
   CLASS_DEFS,
+  DISTANCE_BANDS,
+  STYLE_LABELS,
+  STYLE_KEYS,
   activeHorses,
   ageAt,
   bandForDistance,
@@ -297,3 +300,59 @@ export function marketVM(save: OwnerSave, offers = save.market.offers) {
   return offers.map((o) => ({ offerId: o.offerId, price: o.price, age: ageAt(o.horse, save.week), view: toHorseView(o.horse, save.week) }));
 }
 export type OfferVM = ReturnType<typeof marketVM>[number];
+
+
+/* ---------------- 愛馬の一覧・ホーム用のまとめ ---------------- */
+
+export interface HorseRowVM {
+  /** 直近の着順（新しい順、最大5走） */
+  form: number[];
+  /** 見立てで合いそうな脚質（記号つき。見立てがなければ null） */
+  style: string | null;
+  /** 主な適性（見立てで ◎・○ の距離帯と馬場） */
+  apt: string[];
+}
+
+const GOOD_MARKS = ["◎", "○"];
+
+/** 一覧に出す要点。すべて見立て（推定）と記録からで、真の値は使わない */
+export function horseRow(save: OwnerSave, v: HorseView): HorseRowVM {
+  const form = save.races.filter((r) => r.horseId === v.id).slice(0, 5).map((r) => r.position);
+  let style: string | null = null;
+  for (const st of STYLE_KEYS) {
+    const k = v.knowledge[`style_${st}` as KnowledgeKey];
+    if (k.mark && GOOD_MARKS.includes(k.mark) && (!style || k.mark === "◎")) style = `${STYLE_LABELS[st]}${k.mark}`;
+  }
+  const apt: string[] = [];
+  for (const b of DISTANCE_BANDS) {
+    const k = v.knowledge[b.key];
+    if (k.mark && GOOD_MARKS.includes(k.mark)) apt.push(`${b.label}${k.mark}`);
+  }
+  for (const [key, label] of [["surface_turf", "芝"], ["surface_dirt", "ダート"]] as const) {
+    const k = v.knowledge[key];
+    if (k.mark && GOOD_MARKS.includes(k.mark)) apt.push(`${label}${k.mark}`);
+  }
+  return { form, style, apt };
+}
+
+export interface EventVM {
+  week: number;
+  horseId: string;
+  horseName: string;
+  kind: "race" | "knowledge" | "owner";
+  text: string;
+  raceId?: string;
+}
+
+/** 最近の出来事（レース・見立ての変化・売買など）。古いものと調教の細かい記録は出さない */
+export function recentEvents(save: OwnerSave, limit = 6, weeks = 8): EventVM[] {
+  const out: EventVM[] = [];
+  for (const h of save.horses) {
+    for (const e of h.log) {
+      if (e.week < save.week - weeks) continue;
+      if (e.kind !== "race" && e.kind !== "knowledge" && e.kind !== "owner") continue;
+      out.push({ week: e.week, horseId: h.id, horseName: h.name, kind: e.kind, text: e.text, raceId: e.raceId });
+    }
+  }
+  return out.sort((a, b) => b.week - a.week || (a.kind === "race" ? -1 : 0)).slice(0, limit);
+}
