@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { makeCourse, type CourseDef, type Going } from "@owners/shared";
 import { TrackFrame } from "./trackFrame";
 import { CROWD_COLORS, dirtTexture, grassTexture, labelTexture, turfTexture, windowTexture } from "./textures";
+import { buildTrees } from "./trees";
 
 export interface CourseOptions {
   runners: number;
@@ -228,10 +229,12 @@ export function buildCourse(courseIn: CourseDef, opt: CourseOptions): CourseScen
   group.add(rail(frame, -0.6, 1.0, "#f6f6f2", opt.quality === "high" ? 2.5 : 4, radial)); // 内ラチ
   group.add(rail(frame, W + 0.9, 1.2, "#f6f6f2", opt.quality === "high" ? 3 : 5, radial)); // 外ラチ
   // もう一方の走路（芝なら内側のダート、ダートなら外側の芝）
+  let sibFrame: TrackFrame | undefined;
   if (course.trackId) {
     try {
       const sib = makeCourse(course.trackId, raceIsTurf ? "dirt" : "turf", course.distance);
       const sf = new TrackFrame(sib, 0);
+      sibFrame = sf;
       const m = new THREE.Mesh(ribbon(sf, -1, sf.width + 1, 4, 3, raceIsTurf ? 16 : 24, 0.01), surfaceMat(!raceIsTurf));
       m.receiveShadow = true;
       group.add(m);
@@ -412,46 +415,20 @@ export function buildCourse(courseIn: CourseDef, opt: CourseOptions): CourseScen
   pond.position.set(-frame.S * 0.15, frame.groundHeight(-frame.S * 0.15, 0) - 0.05, 0);
   group.add(pond);
 
-  // ---- 木々（外周と内馬場） ----
-  {
-    const r = rng(7);
-    const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 4, 6);
-    trunkGeo.translate(0, 2, 0);
-    const crownGeo = new THREE.IcosahedronGeometry(3.2, opt.quality === "high" ? 1 : 0);
-    crownGeo.translate(0, 6.2, 0);
-    const count = opt.quality === "high" ? 520 : 240;
-    const trunks = new THREE.InstancedMesh(trunkGeo, track(new THREE.MeshStandardMaterial({ color: "#5b4636", roughness: 1 })), count);
-    const crowns = new THREE.InstancedMesh(crownGeo, track(new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true })), count);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const col = new THREE.Color();
-    let k = 0;
-    let guard = 0;
-    while (k < count && guard++ < count * 20) {
-      // 外周の帯か、内馬場
-      const inField = r() < 0.18;
-      const a = r() * Math.PI * 2;
-      const rad = inField ? r() * 0.7 : 1.08 + r() * 0.35;
-      const x = Math.cos(a) * (frame.S / 2 + frame.R) * rad * (inField ? 0.8 : 1);
-      const z = Math.sin(a) * frame.R * rad * (inField ? 0.7 : 1);
-      const n = frame.nearest(x, z);
-      // 外周の木は、中継カメラの通り道（外ラチから 60m まで）を避ける
-      if (inField ? n.lateral > -18 : n.lateral < W + 70) continue;
-      // スタンドの前後は避ける
-      if (!inField && Math.abs(x - xc) < standLen / 2 + 20 && z * zs > 0) continue;
-      if (inField && Math.abs(x - scx) < 40 && Math.abs(z - zs * scz) < 25) continue;
-      const s = 0.7 + r() * 0.8;
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28);
-      m.compose(new THREE.Vector3(x, frame.groundHeight(x, z) - 0.2, z), q, new THREE.Vector3(s, s * (0.9 + r() * 0.5), s));
-      trunks.setMatrixAt(k, m);
-      crowns.setMatrixAt(k, m);
-      crowns.setColorAt(k, col.setHSL(0.27 + r() * 0.07, 0.42 + r() * 0.2, 0.22 + r() * 0.12));
-      k++;
-    }
-    trunks.count = crowns.count = k;
-    crowns.castShadow = opt.quality === "high";
-    group.add(trunks, crowns);
-  }
+  // ---- 木々（東京競馬場のように、向こう正面の木立・内馬場の林・大木・生け垣） ----
+  const trees = buildTrees({
+    frame,
+    width: W,
+    quality: opt.quality,
+    stand: { x0: xc - standLen / 2, x1: xc + standLen / 2, depth: zFront - (frame.R + W) + rows * rowD + 16 },
+    other: sibFrame,
+    avoid: [
+      { x: scx, z: zs * scz, r: 38 },
+      { x: -frame.S * 0.15, z: 0, r: Math.min(90, frame.S * 0.3) + 6 },
+    ],
+  });
+  group.add(trees.group);
+  disposables.push(trees);
 
   // ---- 遠くの山並み ----
   {
@@ -482,7 +459,10 @@ export function buildCourse(courseIn: CourseDef, opt: CourseOptions): CourseScen
     group,
     frame,
     screen,
-    update: (t) => gate.update(t),
+    update: (t) => {
+      gate.update(t);
+      trees.update(t);
+    },
     dispose: () => {
       group.traverse((o) => {
         const m = o as THREE.Mesh;
