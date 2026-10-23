@@ -1,8 +1,3 @@
-#   where: undefined,
-#   schema: undefined,
-#   table: undefined,
-#   column: undefined,
-#   dataType: undefined,
 #   constraint: undefined,
 #   file: 'postgres.c',
 #   line: '3286',
@@ -13,7 +8,7 @@
 #     _maxListeners: undefined,
 #     connectionParameters: ConnectionParameters {
 #       user: 'postgres',
-#       database: 'horses_test_1602ba2b',
+#       database: 'horses_test_19cac470',
 #       port: 5432,
 #       host: 'localhost',
 #       binary: false,
@@ -32,7 +27,7 @@
 #       connect_timeout: 0
 #     },
 #     user: 'postgres',
-#     database: 'horses_test_1602ba2b',
+#     database: 'horses_test_19cac470',
 #     port: 5432,
 #     host: 'localhost',
 #     replication: undefined,
@@ -69,8 +64,8 @@
 #     _sentQueryQueue: [],
 #     pipeline: false,
 #     binary: false,
-#     processID: 164,
-#     secretKey: 932899092,
+#     processID: 191,
+#     secretKey: -1924068362,
 #     ssl: false,
 #     sslNegotiation: 'postgres',
 #     _connectionTimeoutMillis: 0,
@@ -78,11 +73,17 @@
 #     release: [Function (anonymous)],
 #     readyForQuery: true,
 #     hasExecuted: true,
-#     _poolUseCount: 20,
+#     _poolUseCount: 1,
 #     [Symbol(shapeMode)]: false,
 #     [Symbol(kCapture)]: false
 #   }
 # }
+# Subtest: 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
+ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
+  ---
+  duration_ms: 200.033016
+  type: 'test'
+  ...
 # [db] idle client error error: terminating connection due to administrator command
 #     at parseErrorMessage (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:395:9)
 #     at Parser.handlePacket (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:212:19)
@@ -116,7 +117,7 @@
 #     _maxListeners: undefined,
 #     connectionParameters: ConnectionParameters {
 #       user: 'postgres',
-#       database: 'horses_test_1602ba2b',
+#       database: 'horses_test_2a0163ce',
 #       port: 5432,
 #       host: 'localhost',
 #       binary: false,
@@ -135,7 +136,7 @@
 #       connect_timeout: 0
 #     },
 #     user: 'postgres',
-#     database: 'horses_test_1602ba2b',
+#     database: 'horses_test_2a0163ce',
 #     port: 5432,
 #     host: 'localhost',
 #     replication: undefined,
@@ -172,8 +173,8 @@
 #     _sentQueryQueue: [],
 #     pipeline: false,
 #     binary: false,
-#     processID: 155,
-#     secretKey: -1333054461,
+#     processID: 186,
+#     secretKey: -1332412542,
 #     ssl: false,
 #     sslNegotiation: 'postgres',
 #     _connectionTimeoutMillis: 0,
@@ -181,114 +182,113 @@
 #     release: [Function (anonymous)],
 #     readyForQuery: true,
 #     hasExecuted: true,
-#     _poolUseCount: 7,
+#     _poolUseCount: 1,
 #     [Symbol(shapeMode)]: false,
 #     [Symbol(kCapture)]: false
 #   }
 # }
-# [db] idle client error error: terminating connection due to administrator command
-#     at parseErrorMessage (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:395:9)
-#     at Parser.handlePacket (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:212:19)
-#     at Parser.parse (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:105:30)
-#     at Socket.<anonymous> (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/index.ts:7:48)
-#     at Socket.emit (node:events:519:28)
-#     at addChunk (node:internal/streams/readable:561:12)
-#     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-#     at Readable.push (node:internal/streams/readable:392:5)
-#     at TCP.onStreamRead (node:internal/stream_base_commons:189:23) {
-#   length: 116,
-#   severity: 'FATAL',
-#   code: '57P01',
-#   detail: undefined,
-#   hint: undefined,
-#   position: undefined,
-#   internalPosition: undefined,
-#   internalQuery: undefined,
-#   where: undefined,
-#   schema: undefined,
-#   table: undefined,
-#   column: undefined,
-#   dataType: undefined,
-#   constraint: undefined,
-#   file: 'postgres.c',
-#   line: '3286',
-#   routine: 'ProcessInterrupts',
-#   client: Client {
-#     _events: [Object: null prototype] { error: [Function (anonymous)] },
-#     _eventsCount: 1,
-#     _maxListeners: undefined,
-#     connectionParameters: ConnectionParameters {
-#       user: 'postgres',
-#       database: 'horses_test_1602ba2b',
-#       port: 5432,
-#       host: 'localhost',
-#       binary: false,
-#       options: undefined,
-#       ssl: false,
-#       sslnegotiation: undefined,
-#       client_encoding: '',
-#       replication: undefined,
-#       isDomainSocket: false,
-#       application_name: undefined,
-#       fallback_application_name: undefined,
-#       statement_timeout: false,
-#       lock_timeout: false,
-#       idle_in_transaction_session_timeout: false,
-#       query_timeout: false,
-#       connect_timeout: 0
-#     },
-#     user: 'postgres',
-#     database: 'horses_test_1602ba2b',
-#     port: 5432,
-#     host: 'localhost',
-#     replication: undefined,
-#     _Promise: [Function: Promise],
-#     _types: TypeOverrides { _types: [Object], text: {}, binary: {} },
-#     _ending: true,
-#     _ended: false,
-#     _connecting: false,
-#     _connected: true,
-#     _connectionError: false,
-#     _queryable: false,
-#     _activeQuery: null,
-#     _txStatus: 'I',
-#     enableChannelBinding: false,
-#     scramMaxIterations: 100000,
-#     connection: Connection {
-#       _events: [Object: null prototype],
-#       _eventsCount: 23,
-#       _maxListeners: undefined,
-#       stream: [Socket],
-#       _keepAlive: false,
-#       _keepAliveInitialDelayMillis: 0,
-#       parsedStatements: {},
-#       submittedNamedStatements: {},
-#       ssl: false,
-#       sslNegotiation: 'postgres',
-#       _ending: true,
-#       _emitMessage: false,
-#       _connecting: true,
-#       [Symbol(shapeMode)]: false,
-#       [Symbol(kCapture)]: false
-#     },
-#     _queryQueue: [],
-#     _sentQueryQueue: [],
-#     pipeline: false,
-#     binary: false,
-#     processID: 166,
-#     secretKey: 896053046,
-#     ssl: false,
-#     sslNegotiation: 'postgres',
-#     _connectionTimeoutMillis: 0,
-#     _connectionCallback: null,
-#     release: [Function (anonymous)],
-#     readyForQuery: true,
-#     hasExecuted: true,
-#     _poolUseCount: 20,
-#     [Symbol(shapeMode)]: false,
-#     [Symbol(kCapture)]: false
-#   }
-# }
+# Subtest: 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
+ok 9 - 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
+  ---
+  duration_ms: 767.491483
+  type: 'test'
+  ...
+# Subtest: レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
+ok 10 - レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
+  ---
+  duration_ms: 133.149573
+  type: 'test'
+  ...
+# Subtest: 全員が切断してもレースは確定・保存される
+ok 11 - 全員が切断してもレースは確定・保存される
+  ---
+  duration_ms: 129.378645
+  type: 'test'
+  ...
+# Subtest: 1頭だけなら締切を延長し、2頭目の登録後に開始する
+ok 12 - 1頭だけなら締切を延長し、2頭目の登録後に開始する
+  ---
+  duration_ms: 123.975466
+  type: 'test'
+  ...
+# Subtest: 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
+ok 13 - 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
+  ---
+  duration_ms: 576.027891
+  type: 'test'
+  ...
+# Subtest: 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
+ok 14 - 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
+  ---
+  duration_ms: 99.560269
+  type: 'test'
+  ...
+# Subtest: 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
+ok 15 - 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
+  ---
+  duration_ms: 47.436623
+  type: 'test'
+  ...
+# Subtest: 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
+ok 16 - 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
+  ---
+  duration_ms: 614.113826
+  type: 'test'
+  ...
+# Subtest: 初期馬は1回だけ選べる（同時リクエストでも1頭）
+ok 17 - 初期馬は1回だけ選べる（同時リクエストでも1頭）
+  ---
+  duration_ms: 66.98396
+  type: 'test'
+  ...
+# Subtest: 調教で能力が上がり所持金が減る。休養で疲労が回復する
+ok 18 - 調教で能力が上がり所持金が減る。休養で疲労が回復する
+  ---
+  duration_ms: 56.329461
+  type: 'test'
+  ...
+# Subtest: 他人の馬は調教できない
+ok 19 - 他人の馬は調教できない
+  ---
+  duration_ms: 113.01308
+  type: 'test'
+  ...
+# Subtest: 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
+ok 20 - 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
+  ---
+  duration_ms: 176.87761
+  type: 'test'
+  ...
+# Subtest: レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
+ok 21 - レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
+  ---
+  duration_ms: 153.180201
+  type: 'test'
+  ...
+# Subtest: 同じ raceId で同時に精算を呼んでも1回しか成功しない
+ok 22 - 同じ raceId で同時に精算を呼んでも1回しか成功しない
+  ---
+  duration_ms: 119.95224
+  type: 'test'
+  ...
+# Subtest: 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
+ok 23 - 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
+  ---
+  duration_ms: 99.748909
+  type: 'test'
+  ...
+# Subtest: 他人の馬を自分の名義で精算させようとしても除外される
+ok 24 - 他人の馬を自分の名義で精算させようとしても除外される
+  ---
+  duration_ms: 143.098304
+  type: 'test'
+  ...
+# Subtest: ランキングは獲得賞金順
+ok 25 - ランキングは獲得賞金順
+  ---
+  duration_ms: 2.081105
+  type: 'test'
+  ...
 1..25
 # tests 25
 # suites 0
@@ -297,4 +297,4 @@
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1768.990447
+# duration_ms 4966.070407
