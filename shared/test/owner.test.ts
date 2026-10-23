@@ -27,6 +27,7 @@ import {
   runStableWeek,
   runTrials,
   simulateOwnerRace,
+  baseTopSpeed,
   thisWeekCard,
   toHorseView,
   truthValue,
@@ -439,6 +440,104 @@ test("芝・ダート適性と個性・作戦が結果に影響する", () => {
   assert.ok(earlyPos(front) < earlyPos(deep), `${earlyPos(front)} vs ${earlyPos(deep)}`);
 });
 
+/* ---------------- レース計算の再設計（第1段階：脚質と速度制御の分離） ---------------- */
+
+/** 1頭だけ能力・作戦を変えた8頭立て（他の7頭は能力55・脚質ばらばら） */
+function starField(star: SimRunner, s: number): SimRunner[] {
+  const others = Array.from({ length: 7 }, (_, i) =>
+    runner(`o${i}`, 0, 55, { tactics: { style: (["front", "stalker", "closer", "deep"] as const)[i % 4], pace: "normal", spurt: "normal" } }),
+  );
+  const gate = 1 + (s % 8);
+  let g = 1;
+  for (const o of others) {
+    if (g === gate) g++;
+    o.gate = g++;
+  }
+  return [{ ...star, gate }, ...others];
+}
+const earlyPosOf = (sim: ReturnType<typeof simulateOwnerRace>, id: string) => sim.telemetry[id].positions.find((p) => p.label === "序盤")!.pos;
+
+test("レース計算に Math.random を使わない（シード付き乱数だけで決まる）", () => {
+  const orig = Math.random;
+  Math.random = () => {
+    throw new Error("Math.random が呼ばれた");
+  };
+  try {
+    const cond = { course: makeCourse("shiomi", "dirt", 1700), going: "heavy" as const };
+    const a = simulateOwnerRace(field(), cond, 5);
+    const b = simulateOwnerRace(field(), cond, 5);
+    assert.deepEqual(a.results, b.results);
+    assert.deepEqual(a.telemetry, b.telemetry);
+  } finally {
+    Math.random = orig;
+  }
+});
+
+test("乱数シードを変えると展開（通過順・タイム）が変わる", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 1800), going: "good" as const };
+  const seen = new Set<string>();
+  for (let s = 0; s < 12; s++) {
+    const r = simulateOwnerRace(field(), cond, 900 + s);
+    seen.add(r.results.map((x) => x.id).join(","));
+  }
+  assert.ok(seen.size >= 4, `着順の種類 ${seen.size}`);
+});
+
+test("スピードの高い追い込み馬でも、通常の作戦で序盤から先頭に立つことは常態化しない", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 1800), going: "good" as const };
+  for (const style of ["deep", "closer"] as const) {
+    const star = runner("star", 1, 60, { tactics: { style, pace: "normal", spurt: "normal" } });
+    star.abilities = { ...star.abilities, speed: 92 };
+    let lead = 0;
+    let pos = 0;
+    for (let s = 0; s < 80; s++) {
+      const sim = simulateOwnerRace(starField(star, s), cond, 300 + s);
+      const p = earlyPosOf(sim, "star");
+      if (p === 1) lead++;
+      pos += p;
+    }
+    assert.ok(lead / 80 <= 0.1, `${style}：序盤先頭の割合 ${lead / 80}`);
+    assert.ok(pos / 80 >= (style === "deep" ? 4.5 : 3), `${style}：序盤の平均位置 ${pos / 80}`);
+  }
+});
+
+test("同じ能力の馬でも、脚質を変えると位置取りが変わる（逃げ→先行→差し→追い込みの順に後ろ）", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 2000), going: "good" as const };
+  const avg = (["front", "stalker", "closer", "deep"] as const).map((style) => {
+    let early = 0;
+    let mid = 0;
+    for (let s = 0; s < 60; s++) {
+      const sim = simulateOwnerRace(starField(runner("m", 1, 60, { tactics: { style, pace: "normal", spurt: "normal" } }), s), cond, 40 + s);
+      early += earlyPosOf(sim, "m");
+      mid += sim.telemetry.m.positions.find((p) => p.label === "残り800m")!.pos;
+    }
+    return { early: early / 60, mid: mid / 60 };
+  });
+  for (let i = 1; i < 4; i++) {
+    assert.ok(avg[i].early > avg[i - 1].early, JSON.stringify(avg));
+    assert.ok(avg[i].mid > avg[i - 1].mid, JSON.stringify(avg));
+  }
+  assert.ok(avg[0].early <= 2 && avg[3].early >= 6, JSON.stringify(avg));
+});
+
+test("脚質・作戦を変えても最高速度は変わらない（脚質適性は位置取りの安定や消耗に効く）", () => {
+  const cond = { course: makeCourse("shiomi", "turf", 1800), going: "good" as const };
+  const base = runner("x", 1, 70, { aptitude: { ...runner("x", 1).aptitude, styles: { front: 95, stalker: 60, closer: 30, deep: 5 } } });
+  const tops = (["front", "stalker", "closer", "deep"] as const).flatMap((style) =>
+    (["easy", "normal", "aggressive"] as const).flatMap((pace) =>
+      (["early", "normal", "late"] as const).map((spurt) => baseTopSpeed({ ...base, tactics: { style, pace, spurt } }, cond)),
+    ),
+  );
+  for (const v of tops) assert.equal(v, tops[0]);
+  // 実際の終盤の最高速度も、脚質によって大きくは変わらない
+  const late = (["front", "deep"] as const).map((style) => {
+    let sum = 0;
+    for (let s = 0; s < 40; s++) sum += simulateOwnerRace(starField({ ...base, id: "m", tactics: { style, pace: "normal", spurt: "normal" } }, s), cond, 70 + s).telemetry.m.topSpeedLate;
+    return sum / 40;
+  });
+  assert.ok(Math.abs(late[0] - late[1]) / late[0] < 0.03, JSON.stringify(late));
+});
+
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
   let s = newOwnerGame("テスト", 8);
   s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
@@ -488,17 +587,19 @@ test("自動プレイで3年進めても破綻せず、数値まで判明した�
   assert.ok(close / numeric >= 0.85, `真の値に近い割合 ${close}/${numeric}`);
 });
 
-/* ---------------- UI改修の前後でレース計算が変わらないこと ---------------- */
+/* ---------------- レース計算が意図せず変わっていないこと ---------------- */
 import { generateCpuEntries as _cpu, hash32 as _hash } from "../src/index";
 
-test("レース計算の結果が UI 再設計（v2.0）前と完全に一致する", () => {
+test("レース計算の結果が基準値と完全に一致する（UI・3D の変更でレース結果が変わらない）", () => {
   let acc = "";
   for (const w of [60, 75, 90]) for (const p of raceCard(w)) {
     const cpus = _cpu(p, 8, w * 7);
     const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 13);
     acc += JSON.stringify(sim.results) + JSON.stringify(sim.frames[sim.frames.length - 1]);
   }
-  // v2.0 着手前（コミット a2b7516）で計算した値
-  assert.equal(_hash(acc), 2309594831);
-  assert.equal(acc.length, 13033);
+  // 基準値の履歴（値を変えるのは、レース計算そのものを意図して変えたときだけ）
+  // ・2309594831 / 13033：v2.0 着手前（コミット a2b7516）
+  // ・レース計算の再設計 第1段階（脚質と最高速度の分離・全馬同時更新）で更新
+  assert.equal(_hash(acc), 781492364);
+  assert.equal(acc.length, 12995);
 });

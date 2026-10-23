@@ -1,6 +1,7 @@
 // 馬主モード（指示書 v1.4）のバランス設定ファイル。
 // 情報解明の開示条件・評価ランクの境界・距離適性の補正・観測の精度などはすべてここで調整する。
 // ゲームロジックは引数で設定を受け取れるので、テストや将来のサーバーから別の設定を渡せる。
+import { DEFAULT_SIM_TUNING, type SimTuning } from "./simTuning";
 
 export interface RankBand {
   rank: "S" | "A" | "B" | "C" | "D" | "E";
@@ -57,6 +58,8 @@ export interface GameConfig {
   race: {
     hz: number;
     sampleDt: number;
+    /** レース展開の調整値（simTuning.ts） */
+    tuning: SimTuning;
   };
 }
 
@@ -105,6 +108,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   race: {
     hz: 10,
     sampleDt: 0.25,
+    tuning: DEFAULT_SIM_TUNING,
   },
 };
 
