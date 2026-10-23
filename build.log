@@ -1,6 +1,6 @@
 [36mvite v5.4.21 [32mbuilding for production...[36m[39m
 transforming...
-[32m✓[39m 196 modules transformed.
+[32m✓[39m 198 modules transformed.
 rendering chunks...
 [1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
 (!) /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/sound.ts is dynamically imported by /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/SettingsPanel.tsx but also statically imported by /home/runner/work/Horse-Racing/Horse-Racing/client/src/owner/OwnerApp.tsx, dynamic import will not move module into another chunk.
@@ -9,20 +9,20 @@ computing gzip size...
 [2mdist/[22m[32mversion.json                      [39m[1m[2m  0.06 kB[22m[1m[22m[2m │ gzip:   0.08 kB[22m
 [2mdist/[22m[32mindex.html                        [39m[1m[2m  1.72 kB[22m[1m[22m[2m │ gzip:   0.82 kB[22m
 [2mdist/[22m[2massets/[22m[32massets.worker-DvlBerU7.js  [39m[1m[2m 14.35 kB[22m[1m[22m
-[2mdist/[22m[2massets/[22m[35mindex-BPfsWao9.css         [39m[1m[2m 83.83 kB[22m[1m[22m[2m │ gzip:  17.39 kB[22m
+[2mdist/[22m[2massets/[22m[35mindex-DpxKkjWr.css         [39m[1m[2m 88.12 kB[22m[1m[22m[2m │ gzip:  18.30 kB[22m
 [2mdist/[22m[2massets/[22m[36mreact-ynVORB90.js          [39m[1m[2m141.32 kB[22m[1m[22m[2m │ gzip:  45.38 kB[22m
-[2mdist/[22m[2massets/[22m[36mindex-CN1tQwui.js          [39m[1m[2m436.84 kB[22m[1m[22m[2m │ gzip: 160.86 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-e53zF_7L.js          [39m[1m[2m452.08 kB[22m[1m[22m[2m │ gzip: 164.93 kB[22m
 [2mdist/[22m[2massets/[22m[36mthree-DVO-U7rI.js          [39m[1m[33m513.66 kB[39m[22m[2m │ gzip: 131.02 kB[22m
 [33m
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 2.19s[39m
+[32m✓ built in 3.42s[39m
 
 [36mPWA v2.0.0[39m
 mode      [35mgenerateSW[39m
-precache  [32m12 entries[39m [2m(1247.38 KiB)[22m
+precache  [32m12 entries[39m [2m(1267.76 KiB)[22m
 files generated
   [2mdist/sw.js[22m
   [2mdist/workbox-8f31ecaf.js[22m
