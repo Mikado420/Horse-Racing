@@ -7,18 +7,18 @@ rendering chunks...
 [39m
 computing gzip size...
 [2mdist/[22m[32mversion.json                      [39m[1m[2m  0.06 kB[22m[1m[22m[2m │ gzip:   0.08 kB[22m
-[2mdist/[22m[32mindex.html                        [39m[1m[2m  1.72 kB[22m[1m[22m[2m │ gzip:   0.82 kB[22m
+[2mdist/[22m[32mindex.html                        [39m[1m[2m  1.72 kB[22m[1m[22m[2m │ gzip:   0.81 kB[22m
 [2mdist/[22m[2massets/[22m[32massets.worker-DvlBerU7.js  [39m[1m[2m 14.35 kB[22m[1m[22m
 [2mdist/[22m[2massets/[22m[35mindex-98bJAbVO.css         [39m[1m[2m 84.57 kB[22m[1m[22m[2m │ gzip:  17.48 kB[22m
 [2mdist/[22m[2massets/[22m[36mreact-ynVORB90.js          [39m[1m[2m141.32 kB[22m[1m[22m[2m │ gzip:  45.38 kB[22m
-[2mdist/[22m[2massets/[22m[36mindex-DSEZFL49.js          [39m[1m[2m427.82 kB[22m[1m[22m[2m │ gzip: 157.69 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-Dlr71iEl.js          [39m[1m[2m427.82 kB[22m[1m[22m[2m │ gzip: 157.69 kB[22m
 [2mdist/[22m[2massets/[22m[36mthree-DVO-U7rI.js          [39m[1m[33m513.66 kB[39m[22m[2m │ gzip: 131.02 kB[22m
 [33m
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 3.36s[39m
+[32m✓ built in 2.06s[39m
 
 [36mPWA v2.0.0[39m
 mode      [35mgenerateSW[39m
