@@ -17,8 +17,8 @@
 ✓ index.html がマニフェストを参照
 ✓ apple-touch-icon の参照
 ✓ BASE_URL が置換済み
-✓ ハッシュ付き：assets/index-CiswEWhd.js
-✓ 事前取得の対象：assets/index-CiswEWhd.js
+✓ ハッシュ付き：assets/index-DSEZFL49.js
+✓ 事前取得の対象：assets/index-DSEZFL49.js
 ✓ ハッシュ付き：assets/react-ynVORB90.js
 ✓ 事前取得の対象：assets/react-ynVORB90.js
 ✓ ハッシュ付き：assets/three-DVO-U7rI.js
@@ -27,6 +27,6 @@
 ✓ 事前取得の対象：assets/index-98bJAbVO.css
 ✓ 事前取得の対象：index.html
 ✓ API は事前取得しない
-✓ version.json：37093a47
+✓ version.json：f1d92b3d
 
 ビルド成果物は公開できる状態です
