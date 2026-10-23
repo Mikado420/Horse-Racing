@@ -1,139 +1,36 @@
-  ...
-# Subtest: 準備ができていなければ切り替えない
-ok 8 - 準備ができていなければ切り替えない
-  ---
-  duration_ms: 0.091606
-  type: 'test'
-  ...
-# Subtest: 画面が裏に回ったとき・「更新を適用」を押したときは切り替える
-ok 9 - 画面が裏に回ったとき・「更新を適用」を押したときは切り替える
-  ---
-  duration_ms: 0.06021
-  type: 'test'
-  ...
-# Subtest: 起動直後でまだ操作していなければその場で切り替え、操作を始めていたら待つ
-ok 10 - 起動直後でまだ操作していなければその場で切り替え、操作を始めていたら待つ
-  ---
-  duration_ms: 0.092247
-  type: 'test'
-  ...
-# Subtest: 処理が終わったときは、「更新を適用」を押して待っていた場合だけ切り替える
-ok 11 - 処理が終わったときは、「更新を適用」を押して待っていた場合だけ切り替える
-  ---
-  duration_ms: 0.128101
-  type: 'test'
-  ...
-# Subtest: ほかのタブが更新したとき、レース中のタブは読み込み直さない
-ok 12 - ほかのタブが更新したとき、レース中のタブは読み込み直さない
-  ---
-  duration_ms: 0.062703
-  type: 'test'
-  ...
-# Subtest: 更新の確認：起動時と手動は必ず、復帰時は10分以上、定期は約45分ごと、裏にいる間はしない
-ok 13 - 更新の確認：起動時と手動は必ず、復帰時は10分以上、定期は約45分ごと、裏にいる間はしない
-  ---
-  duration_ms: 0.129093
-  type: 'test'
-  ...
-# Subtest: ブロッカーの表示名
-ok 14 - ブロッカーの表示名
-  ---
-  duration_ms: 0.075453
-  type: 'test'
-  ...
-# Subtest: 歩幅と完歩数：全力で歩幅約7m・毎秒2回強。速いほど歩幅が伸び、接地時間の割合は短くなる
-ok 15 - 歩幅と完歩数：全力で歩幅約7m・毎秒2回強。速いほど歩幅が伸び、接地時間の割合は短くなる
-  ---
-  duration_ms: 0.749748
-  type: 'test'
-  ...
-# Subtest: 着地している蹄は地面に対して止まっている（胴に対して速度 v で後ろへ動く）
-ok 16 - 着地している蹄は地面に対して止まっている（胴に対して速度 v で後ろへ動く）
-  ---
-  duration_ms: 3.939847
-  type: 'test'
-  ...
-# Subtest: 交叉襲歩の足順：左手前は 右後→左後→右前→左前、右手前はその左右反対。最後に4本とも浮く
-ok 17 - 交叉襲歩の足順：左手前は 右後→左後→右前→左前、右手前はその左右反対。最後に4本とも浮く
-  ---
-  duration_ms: 21.087727
-  type: 'test'
-  ...
-# Subtest: 止まっているときは4本とも着地して立つ
-ok 18 - 止まっているときは4本とも着地して立つ
-  ---
-  duration_ms: 0.141671
-  type: 'test'
-  ...
-# Subtest: コースの座標：左回りはレース計算の位置と一致し、右回りは奥行きを反転する。nearest は point の逆
-ok 19 - コースの座標：左回りはレース計算の位置と一致し、右回りは奥行きを反転する。nearest は point の逆
-  ---
-  duration_ms: 2.73564
-  type: 'test'
-  ...
-# Subtest: コースの高さ：坂のある競馬場はゴール前で約2m上り、1周でつながる。18頭が並べる幅を確保する
-ok 20 - コースの高さ：坂のある競馬場はゴール前で約2m上り、1周でつながる。18頭が並べる幅を確保する
-  ---
-  duration_ms: 0.698963
-  type: 'test'
-  ...
-# Subtest: 馬と騎手の形データ：頂点・面があり、骨の重みの合計が1、部位がすべて決まっている
-ok 21 - 馬と騎手の形データ：頂点・面があり、骨の重みの合計が1、部位がすべて決まっている
-  ---
-  duration_ms: 714.560303
-  type: 'test'
-  ...
-# Subtest: 出走予定表：出られるレースの中から、調教師の意見がいちばん前向きなものを勧める
-ok 22 - 出走予定表：出られるレースの中から、調教師の意見がいちばん前向きなものを勧める
-  ---
-  duration_ms: 21.905616
-  type: 'test'
-  ...
-# Subtest: 出走予定表：まだ出られない馬は理由を示す
-ok 23 - 出走予定表：まだ出られない馬は理由を示す
-  ---
-  duration_ms: 1.057227
-  type: 'test'
-  ...
-# Subtest: 今のクラスは勝ち数から決まる（出走条件と同じ区分）
-ok 24 - 今のクラスは勝ち数から決まる（出走条件と同じ区分）
-  ---
-  duration_ms: 3.547457
-  type: 'test'
-  ...
 # Subtest: 毛色は馬ごとに決まり、何度呼んでも変わらない（見た目だけの情報）
-ok 25 - 毛色は馬ごとに決まり、何度呼んでも変わらない（見た目だけの情報）
+ok 24 - 毛色は馬ごとに決まり、何度呼んでも変わらない（見た目だけの情報）
   ---
-  duration_ms: 0.515158
+  duration_ms: 0.574443
   type: 'test'
   ...
 # Subtest: ビューモデル（所有馬・報告・出走候補・販売馬・重要事項）に非公開データが含まれない
-ok 26 - ビューモデル（所有馬・報告・出走候補・販売馬・重要事項）に非公開データが含まれない
+ok 25 - ビューモデル（所有馬・報告・出走候補・販売馬・重要事項）に非公開データが含まれない
   ---
-  duration_ms: 59.269377
+  duration_ms: 122.482109
   type: 'test'
   ...
 # Subtest: 報告の重要度と未確認の判定
-ok 27 - 報告の重要度と未確認の判定
+ok 26 - 報告の重要度と未確認の判定
   ---
-  duration_ms: 39.7911
+  duration_ms: 62.854417
   type: 'test'
   ...
 # Subtest: 重要事項は緊急 → 要確認 → 通常の順に並ぶ
-ok 28 - 重要事項は緊急 → 要確認 → 通常の順に並ぶ
+ok 27 - 重要事項は緊急 → 要確認 → 通常の順に並ぶ
   ---
-  duration_ms: 49.744028
+  duration_ms: 134.524974
   type: 'test'
   ...
-1..28
-# tests 28
+1..27
+# tests 27
 # suites 0
-# pass 28
+# pass 27
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1215.839799
+# duration_ms 1563.56325
 
 > @owners/server@0.1.0 test
 > tsx --test test/*.test.ts
@@ -142,153 +39,256 @@ TAP version 13
 # Subtest: JWT: 正しいトークンは検証でき、改ざん・期限切れ・別鍵は拒否
 ok 1 - JWT: 正しいトークンは検証でき、改ざん・期限切れ・別鍵は拒否
   ---
-  duration_ms: 1.113171
+  duration_ms: 1.493121
   type: 'test'
   ...
 # Subtest: パスワード: ハッシュは毎回異なり、正しいパスワードだけ通る
 ok 2 - パスワード: ハッシュは毎回異なり、正しいパスワードだけ通る
   ---
-  duration_ms: 156.126521
+  duration_ms: 250.29173
   type: 'test'
   ...
 # Subtest: レート制限
 ok 3 - レート制限
   ---
-  duration_ms: 0.353257
+  duration_ms: 0.421798
   type: 'test'
   ...
 # Subtest: 新規登録 → 初期馬選択 → 調教 → 休養 → 詳細表示 の一連の流れ
 ok 4 - 新規登録 → 初期馬選択 → 調教 → 休養 → 詳細表示 の一連の流れ
   ---
-  duration_ms: 395.752168
+  duration_ms: 402.935908
   type: 'test'
   ...
 # Subtest: 認証と入力検証
 ok 5 - 認証と入力検証
   ---
-  duration_ms: 124.808465
+  duration_ms: 332.384967
   type: 'test'
   ...
 # Subtest: 操作の連打はレート制限される
 ok 6 - 操作の連打はレート制限される
   ---
-  duration_ms: 74.094741
+  duration_ms: 127.625358
   type: 'test'
   ...
 # Subtest: CORS：許可したオリジンだけ API を呼べる（事前確認にも応じる）
 ok 7 - CORS：許可したオリジンだけ API を呼べる（事前確認にも応じる）
   ---
-  duration_ms: 648.093477
+  duration_ms: 415.722391
   type: 'test'
   ...
 # Subtest: 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
 ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
   ---
-  duration_ms: 74.959931
+  duration_ms: 85.456733
   type: 'test'
   ...
 # Subtest: 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
 ok 9 - 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
   ---
-  duration_ms: 425.919998
+  duration_ms: 385.250718
   type: 'test'
   ...
 # Subtest: レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
 ok 10 - レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
   ---
-  duration_ms: 93.192794
+  duration_ms: 267.217726
   type: 'test'
   ...
 # Subtest: 全員が切断してもレースは確定・保存される
 ok 11 - 全員が切断してもレースは確定・保存される
   ---
-  duration_ms: 89.626495
+  duration_ms: 162.517286
   type: 'test'
   ...
 # Subtest: 1頭だけなら締切を延長し、2頭目の登録後に開始する
 ok 12 - 1頭だけなら締切を延長し、2頭目の登録後に開始する
   ---
-  duration_ms: 138.935868
+  duration_ms: 179.207126
   type: 'test'
   ...
 # Subtest: 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
 ok 13 - 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
   ---
-  duration_ms: 577.798459
+  duration_ms: 535.283926
   type: 'test'
   ...
 # Subtest: 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
 ok 14 - 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
   ---
-  duration_ms: 71.959425
+  duration_ms: 110.979493
   type: 'test'
   ...
 # Subtest: 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
 ok 15 - 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
   ---
-  duration_ms: 32.07392
+  duration_ms: 39.422957
   type: 'test'
   ...
 # Subtest: 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
 ok 16 - 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
   ---
-  duration_ms: 388.133413
+  duration_ms: 564.406809
   type: 'test'
   ...
 # Subtest: 初期馬は1回だけ選べる（同時リクエストでも1頭）
 ok 17 - 初期馬は1回だけ選べる（同時リクエストでも1頭）
   ---
-  duration_ms: 125.173484
+  duration_ms: 76.191438
   type: 'test'
   ...
 # Subtest: 調教で能力が上がり所持金が減る。休養で疲労が回復する
 ok 18 - 調教で能力が上がり所持金が減る。休養で疲労が回復する
   ---
-  duration_ms: 238.047137
+  duration_ms: 158.029461
   type: 'test'
   ...
 # Subtest: 他人の馬は調教できない
 ok 19 - 他人の馬は調教できない
   ---
-  duration_ms: 160.916566
+  duration_ms: 110.342308
   type: 'test'
   ...
 # Subtest: 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
 ok 20 - 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
   ---
-  duration_ms: 60.547552
+  duration_ms: 81.343097
   type: 'test'
   ...
 # Subtest: レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
 ok 21 - レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
   ---
-  duration_ms: 93.555651
+  duration_ms: 103.195412
   type: 'test'
   ...
 # Subtest: 同じ raceId で同時に精算を呼んでも1回しか成功しない
 ok 22 - 同じ raceId で同時に精算を呼んでも1回しか成功しない
   ---
-  duration_ms: 94.861784
+  duration_ms: 127.416832
   type: 'test'
   ...
 # Subtest: 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
 ok 23 - 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
   ---
-  duration_ms: 65.271869
+  duration_ms: 103.839586
   type: 'test'
   ...
 # Subtest: 他人の馬を自分の名義で精算させようとしても除外される
 ok 24 - 他人の馬を自分の名義で精算させようとしても除外される
   ---
-  duration_ms: 79.324397
+  duration_ms: 121.994767
   type: 'test'
   ...
 # Subtest: ランキングは獲得賞金順
 ok 25 - ランキングは獲得賞金順
   ---
-  duration_ms: 2.368473
+  duration_ms: 1.674657
   type: 'test'
   ...
+# [db] idle client error error: terminating connection due to administrator command
+#     at parseErrorMessage (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:395:9)
+#     at Parser.handlePacket (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:212:19)
+#     at Parser.parse (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:105:30)
+#     at Socket.<anonymous> (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/index.ts:7:48)
+#     at Socket.emit (node:events:519:28)
+#     at addChunk (node:internal/streams/readable:561:12)
+#     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+#     at Readable.push (node:internal/streams/readable:392:5)
+#     at TCP.onStreamRead (node:internal/stream_base_commons:189:23) {
+#   length: 116,
+#   severity: 'FATAL',
+#   code: '57P01',
+#   detail: undefined,
+#   hint: undefined,
+#   position: undefined,
+#   internalPosition: undefined,
+#   internalQuery: undefined,
+#   where: undefined,
+#   schema: undefined,
+#   table: undefined,
+#   column: undefined,
+#   dataType: undefined,
+#   constraint: undefined,
+#   file: 'postgres.c',
+#   line: '3286',
+#   routine: 'ProcessInterrupts',
+#   client: Client {
+#     _events: [Object: null prototype] { error: [Function (anonymous)] },
+#     _eventsCount: 1,
+#     _maxListeners: undefined,
+#     connectionParameters: ConnectionParameters {
+#       user: 'postgres',
+#       database: 'horses_test_013a46ee',
+#       port: 5432,
+#       host: 'localhost',
+#       binary: false,
+#       options: undefined,
+#       ssl: false,
+#       sslnegotiation: undefined,
+#       client_encoding: '',
+#       replication: undefined,
+#       isDomainSocket: false,
+#       application_name: undefined,
+#       fallback_application_name: undefined,
+#       statement_timeout: false,
+#       lock_timeout: false,
+#       idle_in_transaction_session_timeout: false,
+#       query_timeout: false,
+#       connect_timeout: 0
+#     },
+#     user: 'postgres',
+#     database: 'horses_test_013a46ee',
+#     port: 5432,
+#     host: 'localhost',
+#     replication: undefined,
+#     _Promise: [Function: Promise],
+#     _types: TypeOverrides { _types: [Object], text: {}, binary: {} },
+#     _ending: true,
+#     _ended: false,
+#     _connecting: false,
+#     _connected: true,
+#     _connectionError: false,
+#     _queryable: false,
+#     _activeQuery: null,
+#     _txStatus: 'I',
+#     enableChannelBinding: false,
+#     scramMaxIterations: 100000,
+#     connection: Connection {
+#       _events: [Object: null prototype],
+#       _eventsCount: 23,
+#       _maxListeners: undefined,
+#       stream: [Socket],
+#       _keepAlive: false,
+#       _keepAliveInitialDelayMillis: 0,
+#       parsedStatements: {},
+#       submittedNamedStatements: {},
+#       ssl: false,
+#       sslNegotiation: 'postgres',
+#       _ending: true,
+#       _emitMessage: false,
+#       _connecting: true,
+#       [Symbol(shapeMode)]: false,
+#       [Symbol(kCapture)]: false
+#     },
+#     _queryQueue: [],
+#     _sentQueryQueue: [],
+#     pipeline: false,
+#     binary: false,
+#     processID: 238,
+#     secretKey: -441507055,
+#     ssl: false,
+#     sslNegotiation: 'postgres',
+#     _connectionTimeoutMillis: 0,
+#     _connectionCallback: null,
+#     release: [Function (anonymous)],
+#     readyForQuery: true,
+#     hasExecuted: true,
+#     _poolUseCount: 3,
+#     [Symbol(shapeMode)]: false,
+#     [Symbol(kCapture)]: false
+#   }
+# }
 1..25
 # tests 25
 # suites 0
@@ -297,4 +297,4 @@ ok 25 - ランキングは獲得賞金順
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1905.99876
+# duration_ms 4700.489494
