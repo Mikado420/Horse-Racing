@@ -73,6 +73,27 @@ export interface RunnerTelemetry {
   styleShown: RunningStyle;
   /** スタートの出遅れ（秒） */
   startDelay: number;
+  /** 先頭争いをしていた時間（秒）。再設計前の記録にはない */
+  leadBattleSec?: number;
+  /** positions と同じ地点での残りエネルギーの割合（0〜1）。再設計前の記録にはない */
+  reserve?: number[];
+}
+
+export type PaceLabel = "slow" | "average" | "high";
+export const PACE_STATE_LABELS: Record<PaceLabel, string> = { slow: "スローペース", average: "平均ペース", high: "ハイペース" };
+
+/** レース全体のペース。指数は -1（スロー）〜 +1（ハイ） */
+export interface RacePace {
+  /** レース前の予測（逃げ候補の数・個性・発馬・枠・最初のコーナーまでの距離・作戦から） */
+  predicted: number;
+  /** 先頭を争いそうな馬の数（予測） */
+  contenders: number;
+  /** 序盤・中盤の実際のペース指数 */
+  early: number;
+  mid: number;
+  label: PaceLabel;
+  /** 2頭以上で先頭を争っていた時間（秒） */
+  battleSec: number;
 }
 
 export interface SimResultRow {
@@ -92,6 +113,8 @@ export interface SimResult {
   telemetry: Record<string, RunnerTelemetry>;
   /** 先頭の200mごとのラップ（秒） */
   leaderLaps: number[];
+  /** レース全体のペース */
+  pace: RacePace;
 }
 
 const GOING_INDEX: Record<Going, number> = { good: 0, yielding: 1, soft: 2, heavy: 3 };
@@ -120,6 +143,7 @@ interface St {
   tel: RunnerTelemetry;
   passTimes: number[]; // 200mごと
   checkpointTimes: Map<number, number>;
+  checkpointReserve: Map<number, number>;
   keenNow: boolean;
   wantOut: boolean;
   /** 位置取りのぶれ（脚質適性が低いほど大きい） */
@@ -130,6 +154,8 @@ interface St {
   late600Start: number | null;
   duelTicks: number;
   rankAtDuel: number | null;
+  /** 先頭争いから引いた（2番手以下で控えると決めた） */
+  conceded: boolean;
 }
 
 function has(r: SimRunner, t: TraitId) {
@@ -212,6 +238,7 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
     finish: null,
     passTimes: [],
     checkpointTimes: new Map(),
+    checkpointReserve: new Map(),
     keenNow: false,
     wantOut: false,
     wobble: 0,
@@ -221,6 +248,7 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
     late600Start: null,
     duelTicks: 0,
     rankAtDuel: null,
+    conceded: false,
     tel: {
       id: r.id,
       splits: [],
@@ -238,6 +266,7 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
       duel: { occurred: false, gained: false },
       styleShown: r.tactics.style,
       startDelay: Math.round(startDelay * 100) / 100,
+      leadBattleSec: 0,
     },
   };
 }
@@ -274,6 +303,37 @@ export function positionCorrection(p: number, band: [number, number], gain: { up
   return corr;
 }
 
+/** スタートから最初のコーナーまでの距離（m） */
+export function firstCornerDistance(c: OwnerCourse): number {
+  for (let d = 0; d < c.distance; d += 5) if (isCorner(c, d)) return d;
+  return c.distance;
+}
+
+/**
+ * レース前のペース予測。逃げたい馬の数と、その馬たちが先手を取れそうか（加速力・賢さ・パワー）、
+ * 枠順と最初のコーナーまでの距離、ペースの作戦から、先頭争いの起こりやすさを見積もる。
+ * あくまで初期値で、レース中の実際の動きで更新される
+ */
+export function predictPace(runners: readonly SimRunner[], course: OwnerCourse, T: SimTuning = DEFAULT_CONFIG.race.tuning): { contenders: number; index: number } {
+  const n = runners.length;
+  if (n === 0) return { contenders: 0, index: 0 };
+  const dash = (r: SimRunner) => r.abilities.acceleration + 0.5 * r.abilities.power + 0.3 * r.abilities.raceSense;
+  const mean = runners.reduce((a, r) => a + dash(r), 0) / n;
+  // 最初のコーナーが近いほど、外枠からは先手を取りにくい
+  const close = smoothstep(T.cornerFar, T.cornerNear, firstCornerDistance(course));
+  let contenders = 0;
+  for (const r of runners) {
+    const style: RunningStyle = r.traits.includes("frontObsessed") ? "front" : r.tactics.style;
+    let desire = T.leadDesire[style];
+    if (r.traits.includes("frontObsessed")) desire = Math.max(desire, 1);
+    desire *= T.pacePlanDesire[r.tactics.pace];
+    const quick = 1 / (1 + Math.exp(-(dash(r) - mean) / 12));
+    const gateF = 1 - T.gateLeadPenalty * close * (n > 1 ? (r.gate - 1) / (n - 1) : 0);
+    contenders += clamp(desire, 0, 1.3) * (0.4 + 1.2 * quick) * gateF;
+  }
+  return { contenders, index: clamp(T.pacePredict.base + T.pacePredict.perContender * contenders, -1, 1) };
+}
+
 export function simulateOwnerRace(
   runners: SimRunner[],
   cond: SimConditions,
@@ -306,6 +366,15 @@ export function simulateOwnerRace(
   let allDoneAt: number | null = null;
   /** レースの流れ（先頭の速度を平滑化したもの） */
   let paceV = 0;
+  // ペース：レース前の予測を初期値にし、先頭の実際の速度と先頭争いで更新する
+  const predicted = predictPace(sorted, c, T);
+  let paceIdx = predicted.index;
+  const paceIdxK = 1 - Math.exp(-dt / T.paceIndexTau);
+  let battle = 0;
+  const battleK = 1 - Math.exp(-dt / T.battleTau);
+  let battleSec = 0;
+  const paceAcc = { early: 0, earlyN: 0, mid: 0, midN: 0 };
+  const contending = new Array<boolean>(n).fill(false);
 
   const nextD = new Array<number>(n);
   const nextV = new Array<number>(n);
@@ -345,9 +414,35 @@ export function simulateOwnerRace(
       bands[i] = styleBand(style, n, smoothstep(spurtFrom[i] + T.lateShiftLead, spurtFrom[i], D - d0[i]), T);
     }
     const leadErr = lead >= 0 ? softPos[lead] - bands[lead][0] : 0;
+    // 先頭争い：逃げたい馬（控えると決めた馬を除く）が先頭から一定の差の中に何頭いるか
+    let contest = 0;
+    for (let i = 0; i < n; i++) {
+      const st = S[i];
+      const style: RunningStyle = has(st.r, "frontObsessed") ? "front" : st.r.tactics.style;
+      contending[i] =
+        !done0[i] && st.phase !== "spurt" && !st.conceded && T.styleBands[style][0] <= 0.001 && d0[i] > T.battleFrom && leaderD - d0[i] < T.battleRange;
+      if (contending[i]) contest++;
+    }
 
-    // ---- 3. レース全体の流れを更新する ----
+    // ---- 3. レース全体のペースを更新する ----
     if (lead >= 0) paceV += (v0[lead] - paceV) * paceK;
+    battle += ((contest >= 2 ? Math.min(1, (contest - 1) * 0.7) : 0) - battle) * battleK;
+    if (battle > 0.3) battleSec += dt;
+    if (leaderD > T.flowRamp[1]) {
+      // 実際の流れ（出走馬全体の速さに対する先頭の速度）と先頭争いの激しさから、ペース指数をゆっくり動かす
+      const ref = leaderD < earlyEnd ? T.paceRefEarly : T.cruise.mid;
+      const obs = clamp((paceV / fieldTop - ref) / T.paceObsScale + T.battlePace * battle, -1.5, 1.5);
+      paceIdx += (clamp(obs, -1, 1) - paceIdx) * paceIdxK;
+      if (leaderD < earlyEnd + 200) {
+        paceAcc.early += paceIdx;
+        paceAcc.earlyN++;
+      } else if (leaderD < D - 600) {
+        paceAcc.mid += paceIdx;
+        paceAcc.midN++;
+      }
+    }
+    const fast = Math.max(0, paceIdx);
+    const slow = Math.max(0, -paceIdx);
 
     // 1秒ごとの判断（行きたがる・進路・位置取りのぶれ）
     const decide = step % Math.round(1 / dt) === 1;
@@ -399,27 +494,65 @@ export function simulateOwnerRace(
       } else {
         const ph = st.phase === "early" ? "early" : "mid";
         const style: RunningStyle = has(r, "frontObsessed") ? "front" : r.tactics.style;
+        const wantsLead = T.styleBands[style][0] <= 0.001 && !st.conceded;
+        const gapLead = leaderD - d0[i];
         // 自分のリズムで走るときの巡航。出走馬全体の速さを基準にし、自分の最高速度は一部だけ反映する
         // （能力の高い馬ほど同じ流れを楽に走れるが、脚質に関係なく前へ飛ばしていくわけではない）
         const own = fieldTop + (st.top - fieldTop) * T.ownRhythm;
-        const comfort =
-          own * (T.cruise[ph] + (ph === "early" ? T.styleEarlyAdj[style] : 0) + T.pacePlanAdj[r.tactics.pace] + (has(r, "frontObsessed") ? 0.008 : 0));
+        let rhythm = T.cruise[ph] + T.pacePlanAdj[r.tactics.pace] + (has(r, "frontObsessed") ? 0.008 : 0);
+        // 単騎で楽に先頭か：後ろとの差（競りかける馬がいなければ、騎手はペースを落とせる）
+        let soloFree = 0;
+        if (lead === i && contest < 2) {
+          let nearest = Infinity;
+          for (let j = 0; j < n; j++) if (j !== i) nearest = Math.min(nearest, d0[i] - d0[j]);
+          soloFree = smoothstep(T.soloGap * 0.3, T.soloGap, nearest) * smoothstep(T.flowRamp[0], T.flowRamp[1], d0[i]);
+        }
+        if (ph === "early") {
+          // 序盤の脚質による出し方の違い。先頭を確保した逃げ馬はそれ以上出していかない
+          rhythm += T.styleEarlyAdj[style] * (wantsLead ? 1 - soloFree : 1);
+          // 先頭争いが予想されるときは逃げ馬が序盤から出していき、少なければ落ち着いて入る
+          rhythm += (wantsLead ? T.predictedLeadAdj : T.predictedFieldAdj) * predicted.index;
+        }
+        if (lead === i) {
+          if (wantsLead) rhythm -= T.soloRelax * (0.5 + st.rs / 200) * soloFree;
+          else rhythm -= T.reluctantLeadSlow * smoothstep(T.flowRamp[0], T.flowRamp[1], d0[i]);
+        }
+        const comfort = own * rhythm;
         // 先頭の馬が逃げたくて逃げているか（目標帯より大きく前にいるなら、仕方なく先頭にいるだけ）
         const leaderReluctant = lead >= 0 && lead !== i && leadErr < -0.1;
-        const wantsLead = T.styleBands[style][0] <= 0.001;
-        // 先頭から離れるほど、流れ（ペース）に合わせて走る。速い馬でも後方では流れ以上に飛ばさない
-        const follow =
-          wantsLead && leaderReluctant ? 0 : smoothstep(T.flowRamp[0], T.flowRamp[1], d0[i]) * smoothstep(0, T.leadBlendMeters, leaderD - d0[i]);
+        const battling = contending[i] && contest >= 2;
+        // 先頭から離れるほど、流れ（ペース）に合わせて走る。速い馬でも後方では流れ以上に飛ばさない。
+        // ハイペースでは、先頭集団から離れた馬は無理に追いかけず自分のリズムに戻す
+        // 逃げたい馬は先頭近くでは自分のリズム、それ以外の馬は先頭の後ろでは流れに乗る
+        const near = lead === i ? 0 : wantsLead ? smoothstep(0, T.leadBlendMeters, gapLead) : 1;
+        let follow = battling || (wantsLead && leaderReluctant) ? 0 : smoothstep(T.flowRamp[0], T.flowRamp[1], d0[i]) * near;
+        follow *= 1 - T.paceDetach * fast * smoothstep(T.detachFrom[0], T.detachFrom[1], gapLead);
         const base = comfort + (paceV - comfort) * follow;
-        // 脚質に応じた目標位置との差から補正する
-        const band = bands[i];
+        // 脚質に応じた目標位置との差から補正する。スローペースでは後ろの馬も早めに位置を上げる
+        let band = bands[i];
+        if (st.conceded) band = T.concededBand;
+        else if (!wantsLead) band = [band[0] * (1 - T.slowBandShift * slow), band[1] * (1 - T.slowBandShift * slow)];
         if (decide) {
           // 脚質適性が低いほど位置取りが安定しない（ゆっくり動くぶれ）
           const amp = T.styleWobble * (1 - st.styleFit);
           st.wobble = clamp(st.wobble * 0.8 + gaussian(rng) * amp * 0.5, -amp, amp);
         }
-        let corr = positionCorrection(softPos[i] + st.wobble, band, T.posGain[ph], T) * (1 - T.styleStability * (1 - st.styleFit));
-        if (wantsLead && leaderReluctant) corr = Math.max(corr, T.posGain[ph].up);
+        const g0 = T.posGain[ph];
+        const gain = { up: g0.up * (1 - T.paceChaseDamp * fast + T.paceSlowPush * slow), down: g0.down };
+        let corr = positionCorrection(softPos[i] + st.wobble, band, gain, T) * (1 - T.styleStability * (1 - st.styleFit));
+        if (wantsLead && leaderReluctant) corr = Math.max(corr, gain.up);
+        if (battling) {
+          // 先頭争い：互いに譲らず速度が上がり、そのぶん消耗する
+          corr = Math.max(corr, gain.up) + T.battleBoost * battle;
+          st.tel.leadBattleSec! += dt;
+          // 2番手以下の馬は、賢さや作戦に応じて控える判断をする
+          if (decide && lead !== i) {
+            const plan = T.concedePlan[r.tactics.pace];
+            const tired = st.energy < st.energy0 * 0.75 ? 2 : 1;
+            const p = T.concedeRate * (0.3 + st.rs / 100) * plan * tired * (has(r, "frontObsessed") ? 0.15 : 1);
+            if (rng() < p) st.conceded = true;
+          }
+        }
         // 行きたがる：騎手が抑えても前に行こうとして消耗する
         if (decide) {
           const base0 = has(r, "keen") ? 0.35 * (1.2 - st.rs / 120) : 0.01 * (1 - st.rs / 100);
@@ -498,7 +631,7 @@ export function simulateOwnerRace(
       if (!done) {
         // 最高速度が高い馬ほど同じ速度を楽に走れる
         const effort = Math.pow(TOP_REF / st.top, T.costEconomy);
-        const cost = st.costMul * effort * Math.pow(v / T.costRef, 2) * (st.keenNow ? 1.2 : 1) * (crowd >= 2 && has(r, "hatesCrowd") ? 1.05 : 1);
+        const cost = st.costMul * effort * Math.pow(v / T.costRef, 2) * (st.keenNow ? 1.2 : 1) * (crowd >= 2 && has(r, "hatesCrowd") ? 1.05 : 1) * (contending[i] && contest >= 2 ? 1 + T.battleCost * battle : 1);
         st.energy -= cost * v * dt;
         if (st.phase !== "spurt" && d0[i] > 200) {
           st.cruiseSum += v;
@@ -530,13 +663,17 @@ export function simulateOwnerRace(
       }
       for (const cp of checkpoints) {
         const mark = D - cp;
-        if (!st.checkpointTimes.has(cp) && st.d >= mark) st.checkpointTimes.set(cp, interp(mark));
+        if (!st.checkpointTimes.has(cp) && st.d >= mark) {
+          st.checkpointTimes.set(cp, interp(mark));
+          st.checkpointReserve.set(cp, Math.max(0, st.energy) / st.energy0);
+        }
       }
       if (st.late600Start === null && st.d >= D - 600) st.late600Start = interp(D - 600);
       if (st.late200Start === null && st.d >= D - 200) st.late200Start = interp(D - 200);
       if (st.d >= D) {
         st.finish = interp(D);
         if (!st.checkpointTimes.has(0)) st.checkpointTimes.set(0, st.finish);
+        if (!st.checkpointReserve.has(0)) st.checkpointReserve.set(0, Math.max(0, st.energy) / st.energy0);
       }
     }
 
@@ -568,7 +705,10 @@ export function simulateOwnerRace(
   // 通過順位
   for (const cp of checkpoints) {
     const passed = S.map((st) => ({ st, t: st.checkpointTimes.get(cp) ?? 999 })).sort((a, b) => a.t - b.t);
-    passed.forEach(({ st }, k) => st.tel.positions.push({ label: cpLabels.get(cp) ?? `残り${cp}m`, remain: cp, pos: k + 1 }));
+    passed.forEach(({ st }, k) => {
+      st.tel.positions.push({ label: cpLabels.get(cp) ?? `残り${cp}m`, remain: cp, pos: k + 1 });
+      (st.tel.reserve ??= []).push(Math.round((st.checkpointReserve.get(cp) ?? 0) * 100) / 100);
+    });
   }
   // 実際に見せた位置取り（序盤の通過順位から）
   for (const st of S) {
@@ -584,6 +724,7 @@ export function simulateOwnerRace(
     st.tel.blockedSec = Math.round(st.tel.blockedSec * 10) / 10;
     st.tel.keenSec = Math.round(st.tel.keenSec * 10) / 10;
     st.tel.crowdedSec = Math.round(st.tel.crowdedSec * 10) / 10;
+    st.tel.leadBattleSec = Math.round(st.tel.leadBattleSec! * 10) / 10;
     const duelOccurred = st.duelTicks >= 15;
     st.tel.duel = { occurred: duelOccurred, gained: duelOccurred && st.rankAtDuel !== null && finalPos.get(st.r.id)! - 1 < st.rankAtDuel };
   }
@@ -598,6 +739,21 @@ export function simulateOwnerRace(
     prevT = tMin;
   }
 
+  function racePace(): RacePace {
+    const early = paceAcc.earlyN ? paceAcc.early / paceAcc.earlyN : predicted.index;
+    const mid = paceAcc.midN ? paceAcc.mid / paceAcc.midN : early;
+    const overall = 0.5 * early + 0.5 * mid;
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+    return {
+      predicted: r2(predicted.index),
+      contenders: r2(predicted.contenders),
+      early: r2(early),
+      mid: r2(mid),
+      label: overall >= T.paceLabelAt ? "high" : overall <= -T.paceLabelAt ? "slow" : "average",
+      battleSec: Math.round(battleSec * 10) / 10,
+    };
+  }
+
   const telemetry: Record<string, RunnerTelemetry> = {};
   for (const st of S) telemetry[st.r.id] = st.tel;
 
@@ -609,5 +765,6 @@ export function simulateOwnerRace(
     durationSec: (frames.length - 1) * dt * sampleEvery,
     telemetry,
     leaderLaps,
+    pace: racePace(),
   };
 }

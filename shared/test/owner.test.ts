@@ -28,6 +28,8 @@ import {
   runTrials,
   simulateOwnerRace,
   baseTopSpeed,
+  firstCornerDistance,
+  predictPace,
   thisWeekCard,
   toHorseView,
   truthValue,
@@ -538,6 +540,74 @@ test("脚質・作戦を変えても最高速度は変わらない（脚質適�
   assert.ok(Math.abs(late[0] - late[1]) / late[0] < 0.03, JSON.stringify(late));
 });
 
+/* ---------------- 第2段階：レース全体のペースと先頭争い ---------------- */
+
+/** 逃げ馬 nf 頭＋残りは先行・差し・追込の8頭立て（能力は 55〜65 でばらつかせ、枠は回す） */
+function paceField(nf: number, s: number): SimRunner[] {
+  const rest = ["stalker", "stalker", "closer", "closer", "deep", "stalker", "closer", "deep"] as const;
+  return Array.from({ length: 8 }, (_, i) =>
+    runner(`h${i}`, ((i + s) % 8) + 1, 55 + ((i * 7 + s) % 11), { tactics: { style: i < nf ? "front" : rest[i], pace: "normal", spurt: "normal" } }),
+  );
+}
+function paceStats(nf: number, seeds = 40) {
+  const cond = { course: makeCourse("midorigaoka", "turf", 2000), going: "good" as const };
+  let battle = 0, early = 0, mid = 0, firstHalf = 0, frontReserve = 0, frontN = 0;
+  for (let s = 0; s < seeds; s++) {
+    const rs = paceField(nf, s);
+    const sim = simulateOwnerRace(rs, cond, 2000 + s);
+    battle += sim.pace.battleSec;
+    early += sim.pace.early;
+    mid += sim.pace.mid;
+    const L = sim.leaderLaps;
+    firstHalf += L.slice(1, 5).reduce((a, b) => a + b, 0) / 4;
+    for (const r of rs.slice(0, nf)) {
+      const tel = sim.telemetry[r.id];
+      frontReserve += tel.reserve![tel.positions.findIndex((p) => p.label === "残り800m")];
+      frontN++;
+    }
+  }
+  return { battle: battle / seeds, early: early / seeds, mid: mid / seeds, firstHalf: firstHalf / seeds, frontReserve: frontN ? frontReserve / frontN : 0 };
+}
+
+test("レース前のペース予測：逃げ馬が多いほど先頭争いの予想が強まり、最初のコーナーが近いと外枠は先手を取りにくい", () => {
+  const course = makeCourse("midorigaoka", "turf", 2000);
+  const idx = [0, 1, 2, 3].map((nf) => predictPace(paceField(nf, 0), course).index);
+  for (let i = 1; i < idx.length; i++) assert.ok(idx[i] > idx[i - 1], JSON.stringify(idx));
+  assert.ok(idx[0] < -0.3 && idx[3] > 0.3, JSON.stringify(idx));
+  // 逃げ馬が大外枠：最初のコーナーが近いコースでは、遠いコースより先手争いに加わりにくい
+  const near = makeCourse("shiomi", "turf", 1800);
+  const far = makeCourse("midorigaoka", "turf", 1200);
+  assert.ok(firstCornerDistance(near) < firstCornerDistance(far), `${firstCornerDistance(near)} vs ${firstCornerDistance(far)}`);
+  const outside = (c: typeof near) => {
+    const rs = paceField(1, 0).map((r) => ({ ...r, gate: r.id === "h0" ? 8 : r.gate === 8 ? paceField(1, 0)[0].gate : r.gate }));
+    const inside = paceField(1, 0).map((r) => ({ ...r, gate: r.id === "h0" ? 1 : r.gate === 1 ? paceField(1, 0)[0].gate : r.gate }));
+    return predictPace(inside, c).contenders - predictPace(rs, c).contenders;
+  };
+  assert.ok(outside(near) > outside(far), `${outside(near)} vs ${outside(far)}`);
+});
+
+test("逃げ馬が複数いると先頭争いが起こり、序盤のペースが速くなる", () => {
+  const one = paceStats(1);
+  const three = paceStats(3);
+  assert.ok(three.battle > one.battle + 5, JSON.stringify({ one, three }));
+  assert.ok(three.early > one.early + 0.2, JSON.stringify({ one, three }));
+  assert.ok(three.firstHalf < one.firstHalf, JSON.stringify({ one, three }));
+  // 先頭争いをした逃げ馬は余力を多く失う
+  assert.ok(three.frontReserve < one.frontReserve, JSON.stringify({ one, three }));
+});
+
+test("単騎逃げでは先頭争いがある場合よりペースが落ち着き、逃げ馬がいなければスローになりやすい", () => {
+  const none = paceStats(0);
+  const one = paceStats(1);
+  const three = paceStats(3);
+  assert.ok(one.mid < three.mid, JSON.stringify({ one, three }));
+  assert.ok(none.mid < one.mid && none.mid < -0.2, JSON.stringify({ none, one }));
+  assert.equal(one.battle, 0);
+  // ペースの判定がレース結果に付く
+  const sim = simulateOwnerRace(paceField(0, 1), { course: makeCourse("midorigaoka", "turf", 2000), going: "good" }, 5);
+  assert.ok(["slow", "average", "high"].includes(sim.pace.label));
+});
+
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
   let s = newOwnerGame("テスト", 8);
   s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
@@ -600,6 +670,7 @@ test("レース計算の結果が基準値と完全に一致する（UI・3D の
   // 基準値の履歴（値を変えるのは、レース計算そのものを意図して変えたときだけ）
   // ・2309594831 / 13033：v2.0 着手前（コミット a2b7516）
   // ・レース計算の再設計 第1段階（脚質と最高速度の分離・全馬同時更新）で更新
-  assert.equal(_hash(acc), 781492364);
-  assert.equal(acc.length, 12995);
+  // ・第2段階（ペース予測・先頭争い・単騎逃げ）で更新
+  assert.equal(_hash(acc), 1433428049);
+  assert.equal(acc.length, 12986);
 });

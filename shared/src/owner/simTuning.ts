@@ -49,6 +49,58 @@ export interface SimTuning {
   /** 流れ（先頭の速度）を平滑化する時定数（秒） */
   paceTau: number;
 
+  /* ---------- ペースと先頭争い（第2段階） ---------- */
+  /** 脚質ごとの「先頭に立ちたい度合い」（ペース予測用） */
+  leadDesire: Record<RunningStyle, number>;
+  /** ペース作戦が先頭を取りに行く度合いに掛かる倍率 */
+  pacePlanDesire: Record<PacePlan, number>;
+  /** 最初のコーナーまでの距離（m）：この値以下なら「近い」、以上なら「遠い」 */
+  cornerNear: number;
+  cornerFar: number;
+  /** 最初のコーナーが近いとき、大外枠が先手を取りにくくなる割合 */
+  gateLeadPenalty: number;
+  /** 予測ペース指数 = base + perContender × 先頭を争いそうな馬の数 */
+  pacePredict: { base: number; perContender: number };
+  /** 予測ペースが序盤の巡航に与える影響（逃げ馬／それ以外） */
+  predictedLeadAdj: number;
+  predictedFieldAdj: number;
+  /** ペース指数の観測：先頭の速度が中盤の巡航からこの割合ずれると ±1 */
+  paceObsScale: number;
+  /** 序盤のペース指数の基準（先頭の速度が出走馬全体の速さのこの割合なら平均ペース） */
+  paceRefEarly: number;
+  /** ペース指数の平滑化の時定数（秒） */
+  paceIndexTau: number;
+  /** 先頭争いの激しさがペース指数に加わる量 */
+  battlePace: number;
+  /** 先頭争いとみなす範囲：先頭からの差（m）と、スタートからの距離（m） */
+  battleRange: number;
+  battleFrom: number;
+  /** 先頭争いの激しさの時定数（秒） */
+  battleTau: number;
+  /** 先頭争い中の速度の上乗せ（出走馬全体の速さに対する割合）と、消耗の増加 */
+  battleBoost: number;
+  battleCost: number;
+  /** 先頭争いから控える判断の起こりやすさ（1秒あたり）と、ペース作戦による倍率 */
+  concedeRate: number;
+  concedePlan: Record<PacePlan, number>;
+  /** 控えた逃げ馬の目標位置 */
+  concededBand: [number, number];
+  /** 単騎逃げでペースを落とす量（巡航の割合）と、後ろとの差の目安（m） */
+  soloRelax: number;
+  soloGap: number;
+  /** 逃げたくない馬が先頭に立ったときに落とす量（巡航の割合） */
+  reluctantLeadSlow: number;
+  /** ハイペースで、先頭から離れた馬が流れを追わなくなる度合いと、その距離（m） */
+  paceDetach: number;
+  detachFrom: [number, number];
+  /** ハイペースでは位置を上げる補正を弱め、スローでは強める */
+  paceChaseDamp: number;
+  paceSlowPush: number;
+  /** スローペースで後ろの馬の目標位置を前へ移す割合 */
+  slowBandShift: number;
+  /** ペースの表示：平均の指数がこの値以上でハイ、マイナスこの値以下でスロー */
+  paceLabelAt: number;
+
   /* ---------- エネルギー ---------- */
   /** この速度で1mあたり1を消費する（m/秒） */
   costRef: number;
@@ -82,6 +134,36 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   leadBlendMeters: 4,
   flowRamp: [60, 260],
   paceTau: 2,
+
+  leadDesire: { front: 1, stalker: 0.12, closer: 0, deep: 0 },
+  pacePlanDesire: { easy: 0.7, normal: 1, aggressive: 1.25 },
+  cornerNear: 100,
+  cornerFar: 350,
+  gateLeadPenalty: 0.4,
+  pacePredict: { base: -0.75, perContender: 0.6 },
+  predictedLeadAdj: 0.01,
+  predictedFieldAdj: 0.004,
+  paceObsScale: 0.015,
+  paceRefEarly: 0.945,
+  paceIndexTau: 6,
+  battlePace: 0.6,
+  battleRange: 3.6,
+  battleFrom: 40,
+  battleTau: 2,
+  battleBoost: 0.02,
+  battleCost: 0.12,
+  concedeRate: 0.04,
+  concedePlan: { easy: 1.6, normal: 1, aggressive: 0.4 },
+  concededBand: [0.06, 0.3],
+  soloRelax: 0.012,
+  soloGap: 3.5,
+  reluctantLeadSlow: 0.02,
+  paceDetach: 0.6,
+  detachFrom: [8, 30],
+  paceChaseDamp: 0.5,
+  paceSlowPush: 0.5,
+  slowBandShift: 0.15,
+  paceLabelAt: 0.3,
 
   costRef: 17.5,
   costEconomy: 1.0,
