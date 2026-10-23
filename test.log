@@ -1,3 +1,9 @@
+#   internalQuery: undefined,
+#   where: undefined,
+#   schema: undefined,
+#   table: undefined,
+#   column: undefined,
+#   dataType: undefined,
 #   constraint: undefined,
 #   file: 'postgres.c',
 #   line: '3286',
@@ -8,7 +14,7 @@
 #     _maxListeners: undefined,
 #     connectionParameters: ConnectionParameters {
 #       user: 'postgres',
-#       database: 'horses_test_19cac470',
+#       database: 'horses_test_65a7eccd',
 #       port: 5432,
 #       host: 'localhost',
 #       binary: false,
@@ -27,7 +33,7 @@
 #       connect_timeout: 0
 #     },
 #     user: 'postgres',
-#     database: 'horses_test_19cac470',
+#     database: 'horses_test_65a7eccd',
 #     port: 5432,
 #     host: 'localhost',
 #     replication: undefined,
@@ -64,8 +70,8 @@
 #     _sentQueryQueue: [],
 #     pipeline: false,
 #     binary: false,
-#     processID: 191,
-#     secretKey: -1924068362,
+#     processID: 165,
+#     secretKey: -2086125701,
 #     ssl: false,
 #     sslNegotiation: 'postgres',
 #     _connectionTimeoutMillis: 0,
@@ -78,12 +84,6 @@
 #     [Symbol(kCapture)]: false
 #   }
 # }
-# Subtest: 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
-ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハッシュ付きは長期、HTML と Service Worker は毎回確認）
-  ---
-  duration_ms: 200.033016
-  type: 'test'
-  ...
 # [db] idle client error error: terminating connection due to administrator command
 #     at parseErrorMessage (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:395:9)
 #     at Parser.handlePacket (/home/runner/work/Horse-Racing/Horse-Racing/node_modules/pg-protocol/src/parser.ts:212:19)
@@ -117,7 +117,7 @@ ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハ�
 #     _maxListeners: undefined,
 #     connectionParameters: ConnectionParameters {
 #       user: 'postgres',
-#       database: 'horses_test_2a0163ce',
+#       database: 'horses_test_65a7eccd',
 #       port: 5432,
 #       host: 'localhost',
 #       binary: false,
@@ -136,7 +136,7 @@ ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハ�
 #       connect_timeout: 0
 #     },
 #     user: 'postgres',
-#     database: 'horses_test_2a0163ce',
+#     database: 'horses_test_65a7eccd',
 #     port: 5432,
 #     host: 'localhost',
 #     replication: undefined,
@@ -173,8 +173,8 @@ ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハ�
 #     _sentQueryQueue: [],
 #     pipeline: false,
 #     binary: false,
-#     processID: 186,
-#     secretKey: -1332412542,
+#     processID: 164,
+#     secretKey: 452059015,
 #     ssl: false,
 #     sslNegotiation: 'postgres',
 #     _connectionTimeoutMillis: 0,
@@ -190,103 +190,103 @@ ok 8 - 静的配信：マニフェストの MIME とキャッシュ設定（ハ�
 # Subtest: 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
 ok 9 - 2人が登録 → 締切 → 全員に同一のレース経過と同一の着順が届き、賞金と戦績が保存される
   ---
-  duration_ms: 767.491483
+  duration_ms: 349.878469
   type: 'test'
   ...
 # Subtest: レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
 ok 10 - レース中に通信が切れてもサーバーで判定は進み、再接続すると同じ結果を受け取れる
   ---
-  duration_ms: 133.149573
+  duration_ms: 218.514717
   type: 'test'
   ...
 # Subtest: 全員が切断してもレースは確定・保存される
 ok 11 - 全員が切断してもレースは確定・保存される
   ---
-  duration_ms: 129.378645
+  duration_ms: 89.402748
   type: 'test'
   ...
 # Subtest: 1頭だけなら締切を延長し、2頭目の登録後に開始する
 ok 12 - 1頭だけなら締切を延長し、2頭目の登録後に開始する
   ---
-  duration_ms: 123.975466
+  duration_ms: 179.003472
   type: 'test'
   ...
 # Subtest: 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
 ok 13 - 8頭そろった時点で締切を待たずに開始し、9頭目は登録できない
   ---
-  duration_ms: 576.027891
+  duration_ms: 485.242638
   type: 'test'
   ...
 # Subtest: 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
 ok 14 - 不正な参加は拒否される（認証なし・他人の馬・二重登録・別レースとの重複・疲労過多）
   ---
-  duration_ms: 99.560269
+  duration_ms: 73.929871
   type: 'test'
   ...
 # Subtest: 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
 ok 15 - 登録受付中に退出すると出走取消になり、0頭なら締切はリセット
   ---
-  duration_ms: 47.436623
+  duration_ms: 35.115837
   type: 'test'
   ...
 # Subtest: 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
 ok 16 - 登録・ログイン（ユーザー名の重複は大文字小文字を区別せず拒否）
   ---
-  duration_ms: 614.113826
+  duration_ms: 408.387684
   type: 'test'
   ...
 # Subtest: 初期馬は1回だけ選べる（同時リクエストでも1頭）
 ok 17 - 初期馬は1回だけ選べる（同時リクエストでも1頭）
   ---
-  duration_ms: 66.98396
+  duration_ms: 82.168622
   type: 'test'
   ...
 # Subtest: 調教で能力が上がり所持金が減る。休養で疲労が回復する
 ok 18 - 調教で能力が上がり所持金が減る。休養で疲労が回復する
   ---
-  duration_ms: 56.329461
+  duration_ms: 146.599228
   type: 'test'
   ...
 # Subtest: 他人の馬は調教できない
 ok 19 - 他人の馬は調教できない
   ---
-  duration_ms: 113.01308
+  duration_ms: 145.693439
   type: 'test'
   ...
 # Subtest: 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
 ok 20 - 所持金不足の調教は拒否。同時に連打しても残高はマイナスにならない
   ---
-  duration_ms: 176.87761
+  duration_ms: 67.781232
   type: 'test'
   ...
 # Subtest: レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
 ok 21 - レース精算：賞金・戦績・馬の状態が保存され、同じレースは二度精算されない
   ---
-  duration_ms: 153.180201
+  duration_ms: 106.772527
   type: 'test'
   ...
 # Subtest: 同じ raceId で同時に精算を呼んでも1回しか成功しない
 ok 22 - 同じ raceId で同時に精算を呼んでも1回しか成功しない
   ---
-  duration_ms: 119.95224
+  duration_ms: 94.062307
   type: 'test'
   ...
 # Subtest: 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
 ok 23 - 精算時に出走条件を満たさない馬は除外され、2頭未満なら中止（賞金なし）
   ---
-  duration_ms: 99.748909
+  duration_ms: 73.130812
   type: 'test'
   ...
 # Subtest: 他人の馬を自分の名義で精算させようとしても除外される
 ok 24 - 他人の馬を自分の名義で精算させようとしても除外される
   ---
-  duration_ms: 143.098304
+  duration_ms: 104.918586
   type: 'test'
   ...
 # Subtest: ランキングは獲得賞金順
 ok 25 - ランキングは獲得賞金順
   ---
-  duration_ms: 2.081105
+  duration_ms: 1.728911
   type: 'test'
   ...
 1..25
@@ -297,4 +297,4 @@ ok 25 - ランキングは獲得賞金順
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4966.070407
+# duration_ms 1973.728098
