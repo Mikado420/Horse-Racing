@@ -19,7 +19,8 @@ import {
   type KnowledgeKey,
   type RaceHorse,
 } from "./model";
-import { analysisPlan, raceTraitChecks, raceTraitSignChance, trainerRacePlan, type FieldRow, type OwnerRaceRecord } from "./analysis";
+import { analysisPlan, trainerRacePlan, type FieldRow, type OwnerRaceRecord } from "./analysis";
+import { raceTraitEvidence, trainerRaceReview } from "./report";
 import {
   CLASS_DEFS,
   findProgramById,
@@ -33,7 +34,7 @@ import { simulateOwnerRace, PACE_LABELS, SPURT_LABELS, type SimResult, type SimR
 import { runStableWeek, type WeeklyReport } from "./stable";
 import { findTrainer, skillScale, TRAINERS, type Trainer } from "./trainers";
 import { STYLE_LABELS } from "../types";
-import { formatRaceTime, marginLabel } from "../race";
+import { formatRaceTime } from "../race";
 
 export const OWNER_SAVE_VERSION = 2;
 export const LOCAL_OWNER_ID = "local-player";
@@ -571,23 +572,6 @@ function buildRecord(
   };
 }
 
-function trainerRaceComment(r: OwnerRaceRecord, t: Trainer, opinion: TrainerOpinion): string {
-  const tel = r.telemetry;
-  const parts: string[] = [];
-  if (r.position === 1) parts.push("よく頑張ってくれました");
-  else if (r.position <= 3) parts.push("上位争いができたのは収穫です");
-  else {
-    const m = marginLabel(Math.max(0, r.marginToWinner));
-    parts.push(`${m.endsWith("差") ? m : `${m}差`}の${r.position}着でした`);
-  }
-  if (tel.blockedSec >= 3) parts.push("直線で前が詰まる不利がありました");
-  if (tel.emptyRemain !== null) parts.push(`残り${tel.emptyRemain}mあたりで脚が上がっています`);
-  if (tel.keenSec >= 4) parts.push("道中で行きたがって力みました");
-  if (tel.extraMeters >= 8) parts.push("外を回らされる形になりました");
-  if (opinion.stance === "反対") parts.push("やはり今回は無理をさせたと思います");
-  return `${t.name}調教師「${parts.join("。")}。」`;
-}
-
 export function runOwnerRace(
   s: OwnerSave,
   horseId: string,
@@ -610,7 +594,8 @@ export function runOwnerRace(
   const raceSeq = s.counters.raceSeq + 1;
   const raceId = `r${raceSeq}`;
   const record = buildRecord(raceId, p, h0, tactics, sim, names, prize);
-  record.trainerComment = trainerRaceComment(record, trainer, opinion);
+  // 調教師のレース後コメントは、記録（とこの馬の過去のレース）だけから組み立てる
+  record.trainerComment = trainerRaceReview(record, trainer.name, s.races.filter((x) => x.horseId === h0.id));
 
   // レース後の状態（真の情報と状態）
   const rng = createRng((seed ^ 0x5bd1e995) >>> 0);
@@ -650,11 +635,10 @@ export function runOwnerRace(
     ),
   }));
   let knowledge = addEvidence(h0.knowledge, items, s.week, label, cfg);
-  for (const c of raceTraitChecks(record)) {
+  // 個性の兆候は記録に表れた行動だけから決める（真の個性は見ない）
+  for (const c of raceTraitEvidence(record)) {
     if (!c.opportunity) continue;
-    const has = truth.traits.includes(c.trait);
-    const seen = rng() < raceTraitSignChance(c.trait, record, has);
-    if (seen || !has) knowledge = recordTraitSign(knowledge, c.trait, seen, s.week, label, cfg);
+    knowledge = recordTraitSign(knowledge, c.trait, c.appeared, s.week, label, cfg);
   }
   const prevEvents = new Set(h0.knowledge.events);
   const newEvents = knowledge.events.filter((e) => !prevEvents.has(e));
