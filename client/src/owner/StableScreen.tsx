@@ -1,12 +1,12 @@
 // 厩舎：報告一覧（要約 → タップで詳細と直接操作）と調教師
 import { useState } from "react";
-import { TRAINERS } from "@owners/shared";
+import { TRAINERS, shortWeekLabel } from "@owners/shared";
 import { ScreenHead } from "./AppShell";
-import { ReportSheet } from "./actions";
+import { PolicyEditor, ReportSheet } from "./actions";
 import { useOwner, type Route, type StableTab } from "./context";
 import { EmptyState } from "./feedback";
 import { Icon } from "./icons";
-import { StableReportCard, Tabs, yen } from "./ui";
+import { Pane, StableReportCard, StateMeters, Tabs, yen } from "./ui";
 import type { ReportVM } from "./vm";
 
 type StableRoute = Extract<Route, { tab: "stable" }>;
@@ -14,7 +14,7 @@ type Filter = "all" | "unread" | "reply" | "urgent";
 
 export function StableScreen({ route }: { route: StableRoute }) {
   const { nav, vm } = useOwner();
-  const sub = route.sub ?? "reports";
+  const sub = route.sub ?? "training";
   const unread = vm.reports.filter((r) => r.unread).length;
   return (
     <div className="screen">
@@ -24,14 +24,68 @@ export function StableScreen({ route }: { route: StableRoute }) {
           label="厩舎"
           value={sub}
           items={[
-            ["reports", "報告"],
+            ["training", "調教"],
+            ["reports", unread ? `報告（未確認 ${unread}）` : "報告"],
             ["trainers", "調教師"],
           ]}
           onChange={(t) => nav.replace({ tab: "stable", sub: t })}
         />
       </div>
-      <div className="tab-body scroll">{sub === "reports" ? <Reports initial={route.reportId} /> : <Trainers />}</div>
+      <div className="tab-body scroll">
+        {sub === "training" && <Training horseId={route.horseId} />}
+        {sub === "reports" && <Reports initial={route.reportId} />}
+        {sub === "trainers" && <Trainers />}
+      </div>
     </div>
+  );
+}
+
+/** 調教：馬を選ぶ → 状態を確かめる → 方針を選ぶ → 確かめて依頼する */
+function Training({ horseId }: { horseId?: string }) {
+  const { vm, save, nav } = useOwner();
+  const id = vm.horses.some((h) => h.view.id === horseId) ? horseId! : vm.horses[0]?.view.id;
+  if (!id) return <EmptyState icon="horse" title="預けている馬がいません">馬を買って厩舎に預けると、ここで調教を依頼できます。</EmptyState>;
+  const h = vm.horses.find((x) => x.view.id === id)!;
+  const last = save.reports.find((r) => r.horseId === id);
+  return (
+    <>
+      <div className="horse-pick" role="radiogroup" aria-label="調教する馬">
+        {vm.horses.map((x) => (
+          <button key={x.view.id} role="radio" aria-checked={x.view.id === id} className="horse-chip" onClick={() => nav.replace({ tab: "stable", sub: "training", horseId: x.view.id })}>
+            <strong>{x.view.name}</strong>
+            <small>{x.condition.label}</small>
+          </button>
+        ))}
+      </div>
+      <div className="cols">
+        <Pane title={`${h.view.name}の状態`}>
+          <StateMeters s={h.view.state} />
+          <dl className="facts compact">
+            <div>
+              <dt>預け先</dt>
+              <dd>{h.trainerName}厩舎（信頼 {Math.round(h.view.relationship)}）</dd>
+            </div>
+            <div>
+              <dt>次の予定</dt>
+              <dd>{h.nextPlan}</dd>
+            </div>
+          </dl>
+          {last && (
+            <div className="last-rep">
+              <p className="muted">{shortWeekLabel(last.week)}の報告（{last.planLabel}）</p>
+              {last.lines.map((l, i) => (
+                <p key={i}>{l}</p>
+              ))}
+              {last.workout && <p className="muted">調教時計：{last.workout}</p>}
+            </div>
+          )}
+        </Pane>
+        <Pane title="調教の依頼（育成方針）">
+          <p className="hint2">方針は調教の細かな命令ではなく、厩舎が毎週の調教を組むときの優先事項です。依頼した内容は次に週を進めたときから反映されます。</p>
+          <PolicyEditor key={id} horseId={id} />
+        </Pane>
+      </div>
+    </>
   );
 }
 

@@ -6,14 +6,14 @@ import type { UiSettings, UiState } from "./uiState";
 import type { OwnerVM } from "./vm";
 
 export type HorseTab = "overview" | "care" | "ability" | "reports" | "races" | "owner";
-export type StableTab = "reports" | "trainers";
+export type StableTab = "training" | "reports" | "trainers";
 export type RecordsTab = "races" | "analysis" | "evals" | "ledger" | "lab";
 
 export type Route =
   | { tab: "home" }
   | { tab: "horses"; horseId?: string; detail?: boolean; horseTab?: HorseTab }
   | { tab: "shop" }
-  | { tab: "stable"; sub?: StableTab; reportId?: string }
+  | { tab: "stable"; sub?: StableTab; reportId?: string; horseId?: string }
   | { tab: "race"; horseId?: string; programId?: string }
   | { tab: "records"; sub?: RecordsTab; raceId?: string; horseId?: string };
 

@@ -16,8 +16,8 @@ import { ScreenHead } from "./AppShell";
 import { useOwner, type Route } from "./context";
 import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedback";
 import { Icon, type IconName } from "./icons";
-import { ActionBar, HorseConditionBadge, Mood, StanceTag, StateMeters, trainerName, yen } from "./ui";
-import { classLabel, currentClassLabel, entryOptions, entryOverview, stakesAhead, type EntryVM } from "./vm";
+import { ActionBar, HorseConditionBadge, Mood, StanceTag, StateMeters, Tabs, trainerName, yen } from "./ui";
+import { classLabel, currentClassLabel, entryOptions, entryOverview, programOverview, stakesAhead, type EntryVM, type ProgramRowVM } from "./vm";
 import { HorseFigure } from "./art";
 import { preloadRaceAssets } from "../three/model/assets";
 
@@ -45,21 +45,38 @@ function fatigueWord(f: number): { word: string; lvl: "ok" | "warn" | "bad"; ico
 /** 出走予定表：今週、どの馬をどのレースに出すかを一覧で決める */
 function EntryBoard() {
   const { vm, save, nav } = useOwner();
+  const [view, setView] = useState<"horse" | "program">("horse");
   const rows = useMemo(() => entryOverview(save, vm), [save, vm]);
+  const programs = useMemo(() => programOverview(save, vm), [save, vm]);
   const ready = rows.filter((r) => r.eligible > 0).length;
   const open = (id: string) => nav.push({ tab: "race", horseId: id });
   if (vm.horses.length === 0) {
     return (
       <div className="screen">
-        <ScreenHead title="出走予定表" />
+        <ScreenHead title="レース" />
         <EmptyState icon="horse" title="現役の馬がいません" action={<button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>馬を買う</button>} />
       </div>
     );
   }
   return (
     <div className="screen">
-      <ScreenHead title="出走予定表" sub={`${shortWeekLabel(save.week)}の番組／出走できる馬 ${ready}頭`} />
+      <div className="head-tabs">
+        <ScreenHead title="レース" sub={`${shortWeekLabel(save.week)}の番組 ${programs.length}レース／出走できる馬 ${ready}頭`} />
+        <Tabs
+          label="選び方"
+          value={view}
+          items={[
+            ["horse", "馬から選ぶ"],
+            ["program", "レースから選ぶ"],
+          ]}
+          onChange={setView}
+        />
+      </div>
       <div className="scroll board-scroll">
+        {view === "program" ? (
+          <ProgramBoard rows={programs} />
+        ) : (
+        <>
         <table className="board">
           <thead>
             <tr>
@@ -141,6 +158,8 @@ function EntryBoard() {
         <p className="board-legend">
           おすすめは調教師の意見がいちばん前向きなレースです。出走するレースと作戦は、次の画面で選びます。
         </p>
+        </>
+        )}
         <details className="stakes-ahead">
           <summary>今後の重賞（開催時期）</summary>
           <ul className="plain-list">
@@ -154,6 +173,77 @@ function EntryBoard() {
         </details>
       </div>
     </div>
+  );
+}
+
+/** 今週の番組（競馬場の開催案内のように、レースごとに条件と出られる愛馬を並べる） */
+function ProgramBoard({ rows }: { rows: ProgramRowVM[] }) {
+  const { nav } = useOwner();
+  return (
+    <>
+      <table className="paper-table program-table">
+        <caption className="sr-only">今週の番組</caption>
+        <thead>
+          <tr>
+            <th scope="col">レース</th>
+            <th scope="col">コース</th>
+            <th scope="col">馬場</th>
+            <th scope="col">条件</th>
+            <th scope="col">1着賞金</th>
+            <th scope="col">出られる愛馬（調教師の意見）</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ program: p, horses }) => (
+            <tr key={p.id} className={horses.length ? "" : "is-off"}>
+              <th scope="row">
+                <strong className="pt-name">{p.name}</strong>
+                <span className="pill">{classLabel(p)}</span>
+                {p.named && <span className="pill pill-gold">重賞</span>}
+              </th>
+              <td data-label="コース">
+                {p.course.trackName} {SURFACE_LABELS[p.course.surface]}
+                {p.course.distance}m<small>{p.course.direction === "right" ? "右回り" : "左回り"}{p.course.slope ? "・坂" : ""}{p.course.tight ? "・小回り" : ""}</small>
+              </td>
+              <td data-label="馬場">{GOING_LABELS[p.going]}</td>
+              <td data-label="条件">{p.conditionText}</td>
+              <td data-label="1着賞金" className="num">{yen(p.firstPrize)}</td>
+              <td data-label="出られる愛馬">
+                {horses.length ? (
+                  <span className="pt-horses">
+                    {horses.map((h) => (
+                      <button key={h.id} className="btn btn-small btn-ghost" onClick={() => nav.push({ tab: "race", horseId: h.id, programId: p.id })}>
+                        {h.name}
+                        <StanceTag stance={h.stance} />
+                      </button>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="muted">出られる馬なし</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="board-legend">馬を選ぶと、適性と状態の確認・作戦の設定に進みます。出られない理由は「馬から選ぶ」で確認できます。</p>
+    </>
+  );
+}
+
+const ENTRY_STEPS = ["馬を選ぶ", "レースを選ぶ", "適性と状態を確認", "作戦を決める", "最終確認"];
+
+/** 出走までの段階（いまどこにいるか） */
+function EntrySteps({ step }: { step: number }) {
+  return (
+    <ol className="entry-steps" aria-label="出走までの段階">
+      {ENTRY_STEPS.map((l, i) => (
+        <li key={l} className={i < step ? "is-done" : i === step ? "is-now" : ""} aria-current={i === step ? "step" : undefined}>
+          <span className="es-no">{i < step ? "✓" : i + 1}</span>
+          {l}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -188,7 +278,7 @@ function RaceEntryHorse({ route }: { route: RaceRoute }) {
       const p = selected.program;
       const ok = await confirm({
         title: "出走の確認",
-        okLabel: "出走を確定する",
+        okLabel: "この内容で出走する",
         danger: selected.opinion?.stance === "反対",
         body: (
           <dl className="facts compact">
@@ -247,6 +337,7 @@ function RaceEntryHorse({ route }: { route: RaceRoute }) {
     <div className="screen">
       <div className="head-tabs">
       <ScreenHead nav={nav} title="出走計画" sub={`${shortWeekLabel(save.week)}の番組`} />
+      <EntrySteps step={!horseId ? 0 : !selected ? 1 : 3} />
       <div className="chip-row horse-chips" role="radiogroup" aria-label="出走させる馬">
         {vm.horses.map((h) => (
           <button
@@ -312,7 +403,7 @@ function RaceEntryHorse({ route }: { route: RaceRoute }) {
       <ActionBar info={selected ? <span>{selected.program.name}</span> : <span className="muted">レースを選ぶと出走できます</span>}>
         <button className="btn btn-primary" disabled={!selected || !tactics || busy} onClick={go}>
           <Icon name="race" />
-          出走を確定する
+          出走内容を確認
         </button>
       </ActionBar>
       {sheetOpen && detail && (
@@ -321,7 +412,7 @@ function RaceEntryHorse({ route }: { route: RaceRoute }) {
           onClose={() => setSheetOpen(false)}
           actions={
             <button className="btn btn-primary" disabled={busy} onClick={() => (setSheetOpen(false), go())}>
-              出走を確定する
+              出走内容を確認
             </button>
           }
         >

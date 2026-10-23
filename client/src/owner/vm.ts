@@ -5,6 +5,9 @@ import {
   ABILITY_KEYS,
   CLASS_DEFS,
   DISTANCE_BANDS,
+  PLAN_DEFS,
+  proposePlan,
+  type HorsePolicy,
   STYLE_LABELS,
   STYLE_KEYS,
   activeHorses,
@@ -355,4 +358,49 @@ export function recentEvents(save: OwnerSave, limit = 6, weeks = 8): EventVM[] {
     }
   }
   return out.sort((a, b) => b.week - a.week || (a.kind === "race" ? -1 : 0)).slice(0, limit);
+}
+
+
+/* ---------------- 調教（育成方針）の見込み ---------------- */
+
+export interface PlanPreviewVM {
+  label: string;
+  reason: string;
+  /** 調教師が馬の状態を見て、方針と違う内容にしそうか */
+  adjusted: boolean;
+  /** 方針を優先させるため、調教師の懸念を押し切ることになるか */
+  overridden: boolean;
+}
+
+/**
+ * この方針にしたとき、今週厩舎が組む調教の見込み（ゲームの規則どおりに判定。結果の数値や能力は出さない）
+ */
+export function planPreview(save: OwnerSave, horseId: string, policy: HorsePolicy): PlanPreviewVM | null {
+  const h = save.horses.find((x) => x.id === horseId);
+  if (!h || h.status !== "active") return null;
+  const goal = policy.goalRaceId ? findProgramById(policy.goalRaceId) : undefined;
+  const p = proposePlan({ ...h, policy }, save.week, goal ? goal.week - save.week : null);
+  return { label: PLAN_DEFS[p.plan].label, reason: p.reason, adjusted: p.adjusted, overridden: p.overridden };
+}
+
+
+/* ---------------- 今週の番組（レースから選ぶ） ---------------- */
+
+export interface ProgramRowVM {
+  program: OwnerProgram;
+  /** このレースに出られる愛馬と、調教師の意見 */
+  horses: { id: string; name: string; stance: TrainerOpinion["stance"] }[];
+}
+
+/** 今週の番組と、それぞれに出られる愛馬（出走条件はゲームの規則どおり。出られない馬は載せない） */
+export function programOverview(save: OwnerSave, vm: OwnerVM): ProgramRowVM[] {
+  return thisWeekCard(save).map((p) => ({
+    program: p,
+    horses: vm.horses
+      .filter((h) => {
+        const raw = save.horses.find((x) => x.id === h.view.id)!;
+        return !entryProblem(save, raw, p);
+      })
+      .map((h) => ({ id: h.view.id, name: h.view.name, stance: trainerOpinion(save, h.view.id, p.id).stance })),
+  }));
 }
