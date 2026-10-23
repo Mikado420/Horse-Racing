@@ -489,16 +489,29 @@ test("自動プレイで3年進めても破綻せず、数値まで判明した�
 });
 
 /* ---------------- UI改修の前後でレース計算が変わらないこと ---------------- */
-import { generateCpuEntries as _cpu, hash32 as _hash } from "../src/index";
+import { generateCpuEntries as _cpu, hash32 as _hash, LEGACY_RACE_V20 } from "../src/index";
 
-test("レース計算の結果が UI 再設計（v2.0）前と完全に一致する", () => {
+function pinnedRaces(cfg?: Parameters<typeof simulateOwnerRace>[3]): string {
   let acc = "";
   for (const w of [60, 75, 90]) for (const p of raceCard(w)) {
     const cpus = _cpu(p, 8, w * 7);
-    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 13);
+    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 13, cfg);
     acc += JSON.stringify(sim.results) + JSON.stringify(sim.frames[sim.frames.length - 1]);
   }
+  return acc;
+}
+
+test("レース計算の結果が UI 再設計（v2.0）前と完全に一致する（変更前の設定 LEGACY_RACE_V20 で）", () => {
+  // 着差の調整（docs/margins）で既定の計算は変わったが、変更前の設定を渡せば同じ結果を再現できること
+  const acc = pinnedRaces(withConfig({ race: LEGACY_RACE_V20 }));
   // v2.0 着手前（コミット a2b7516）で計算した値
   assert.equal(_hash(acc), 2309594831);
   assert.equal(acc.length, 13033);
+});
+
+test("レース計算の結果が着差の調整（v2.1）後の値と完全に一致する", () => {
+  // 計算式を意図して変えたときは docs/margins に理由と前後の比較を残してから、この値を更新する
+  const acc = pinnedRaces();
+  assert.equal(_hash(acc), 3899164333);
+  assert.equal(acc.length, 12981);
 });
