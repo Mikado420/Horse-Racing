@@ -304,6 +304,7 @@ export function runStableWeek(
   const obsCount = relationship < 30 ? 1 : stage <= 1 ? 1 + (rng() < 0.5 ? 1 : 0) : 2;
   const items: { key: KnowledgeKey; evidence: Evidence }[] = [];
   const obsLines: string[] = [];
+  const observed: KnowledgeKey[] = [];
   const targets = plan.plan === "injuryCare" ? [] : observationTargets(h0, week, rng, obsCount);
   for (const key of targets) {
     const ev = makeEvidence(
@@ -314,8 +315,7 @@ export function runStableWeek(
       cfg,
     );
     items.push({ key, evidence: ev });
-    if (isAbilityKey(key)) obsLines.push((stage <= 1 ? FARM_COMMENT : OBS_COMMENT)[key][level(ev.v)]);
-    else obsLines.push(aptitudeImpression(key, ev.v));
+    observed.push(key);
   }
 
   // 調教時計（2歳以上で、負荷のある調教をしたとき）
@@ -363,13 +363,24 @@ export function runStableWeek(
 
   let knowledge = addEvidence(h0.knowledge, items, week, label, cfg);
 
+  // 観察コメントは、1回の観測値ではなく、それまでの観察を積み上げた見立て（推定）から作る。
+  // 同じ馬について週ごとに逆のことを言わないように。見立てが固まっていなければそう添える
+  const obsTexts = observed.map((key) => {
+    const e = knowledge.entries[key];
+    const v = e.estimatedValue ?? cfg.disclosure.priorMean;
+    const text = isAbilityKey(key) ? (stage <= 1 ? FARM_COMMENT : OBS_COMMENT)[key][level(v)] : aptitudeImpression(key, v);
+    return e.uncertainty > cfg.disclosure.rankSd ? `${text}（まだ見極め中）` : text;
+  });
+  obsLines.unshift(...obsTexts);
+
   // 個性の兆候（日常の様子・調教で見えるもの）
   if (plan.plan !== "injuryCare") {
     const tScale = skillScale(trainer, "raceSense");
     for (const t of TRAIT_IDS) {
       if (TRAIT_DEFS[t].seenIn !== "both") continue;
       const hasTrait = truth.traits.includes(t);
-      const p = hasTrait ? (stage <= 1 ? 0.1 : 0.2) / tScale : 0.004 * tScale;
+      // 個性を持たない馬に、乱数だけで兆候を記録することはしない（根拠のない誤情報になるため）
+      const p = hasTrait ? (stage <= 1 ? 0.1 : 0.2) / tScale : 0;
       const seen = rng() < p;
       if (seen) {
         knowledge = recordTraitSign(knowledge, t, true, week, label, cfg);

@@ -146,3 +146,44 @@ export function composeTrainerComment(r: OwnerRaceRecord, trainerName: string, d
   }
   return { text: `${trainerName}調教師「${parts.join("。")}。」`, claims };
 }
+
+/** 事実の短い言い方（総評の「主な観察事項」用。記録と観察だけ） */
+const FACT_SHORT: Partial<Record<FactId, string>> = {
+  ledEarly: "序盤は先頭",
+  rearEarly: "序盤は{pos}番手と後方",
+  gainedLate: "残り400mの{from}番手から{to}着へ順位を上げた",
+  lostLate: "残り400mの{from}番手から{to}着へ順位を下げた",
+  fastLast3f: "上がり3Fは出走馬で{rank}番目",
+  slowLast3f: "上がり3Fは出走馬で{rank}番目（遅い方）",
+  finalFurlongSlowed: "最後の1ハロンで脚色が鈍った",
+  blocked: "直線で前が壁になる場面があった",
+  wide: "コーナーで外を回った",
+  keen: "道中で行きたがった（騎手の報告）",
+  slowStart: "スタートで後手に回った",
+  duelWon: "ゴール前の競り合いで前に出た",
+  duelLost: "ゴール前の競り合いで前に出られなかった",
+  positionDiffered: "作戦とは違う位置取りになった",
+};
+const FACT_ORDER: FactId[] = ["blocked", "slowStart", "keen", "wide", "gainedLate", "lostLate", "fastLast3f", "slowLast3f", "finalFurlongSlowed", "duelWon", "duelLost", "rearEarly", "ledEarly", "positionDiffered"];
+
+/** 主な観察事項（最大 max 件。記録・観察の事実だけ。見解は含めない） */
+export function keyObservations(diag: RaceDiagnosis, max = 3): { id: FactId; cls: "record" | "observed"; text: string }[] {
+  const out: { id: FactId; cls: "record" | "observed"; text: string }[] = [];
+  for (const id of FACT_ORDER) {
+    const f = diag.facts.find((x) => x.id === id);
+    if (!f || !FACT_SHORT[id]) continue;
+    out.push({ id, cls: f.cls, text: fill(FACT_SHORT[id]!, f.params) });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** 見解の短い言い方（推定であることが分かる文） */
+export function viewText(v: View): string {
+  return VIEW_TEXT[v.id][v.strength][0];
+}
+
+/** 検討事項の文 */
+export function suggestionText(id: SuggestionId): string {
+  return SUGGEST_TEXT[id][0];
+}

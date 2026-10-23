@@ -34,7 +34,9 @@ test("古いレース記録も分析・表示でき、新しいレースを走�
   for (const r of s.races) {
     const f = analyzeRace(r);
     assert.ok(f.length >= 5);
-    assert.ok(!f.some((x) => x.title === "レースの流れ"), "ペースの記録がない古いレースでは流れを推測しない");
+    // 流れは記録されたラップだけから判定するので、古い記録でも同じ基準で示せる
+    const flow = f.find((x) => x.title === "レースの流れ");
+    if (r.leaderLaps.length >= 4) assert.ok(flow && flow.cls === "estimate");
   }
   assert.ok(buildVM(s, new Set()));
   // 数週進めて新しいレースに出す

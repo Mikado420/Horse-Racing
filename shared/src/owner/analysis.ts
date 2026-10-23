@@ -10,6 +10,7 @@ import type { RacePace, RunnerTelemetry, Tactics } from "./sim";
 import type { ClassId } from "./racecard";
 import { STYLE_LABELS, GOING_LABELS } from "../types";
 import { formatRaceTime } from "../race";
+import { diagnoseRace, type FactId, type InfoClass } from "./diagnosis";
 
 export interface FieldRow {
   gate: number;
@@ -60,6 +61,8 @@ export interface InfoItem {
 
 export interface Finding {
   title: string;
+  /** 情報の分類：記録された事実／観察できる事実／推定・見解 */
+  cls: InfoClass;
   text: string;
   informs: InfoItem[];
   /** 情報が得られなかった項目とその理由 */
@@ -75,102 +78,119 @@ export function last600Rank(r: OwnerRaceRecord): number {
   return sorted.findIndex((f) => f.isMine) + 1;
 }
 
-/** 記録から読み取れることを並べる（真の値は使わない） */
-export function analyzeRace(r: OwnerRaceRecord): Finding[] {
+/**
+ * 記録から読み取れることを並べる（真の値もレース計算の内部の数値も使わない）。
+ * 使うのは着順・タイム・ラップ・通過順位・上がり3F・出走馬の結果・条件と、映像や騎手の報告で分かる出来事だけ。
+ * 各項目には情報の分類（記録・観察・推定）を付ける
+ */
+export function analyzeRace(r: OwnerRaceRecord, history: readonly OwnerRaceRecord[] = []): Finding[] {
   const t = r.telemetry;
   const D = r.course.distance;
   const out: Finding[] = [];
   const l3rank = last600Rank(r);
+  const d = diagnoseRace(r, history);
+  const f = (id: FactId) => d.facts.some((x) => x.id === id);
+  const fact = (id: FactId) => d.facts.find((x) => x.id === id);
+  const p400 = t.positions.find((p) => p.remain === 400)?.pos;
+  const blocked = f("blocked");
 
-  // 1. スピード（走破タイムとラップ）
-  const blocked = t.blockedSec >= 3;
+  // 1. 走破タイムとラップ（記録）
+  const lastF = finalFurlong(r);
   out.push({
-    title: "走破タイムと巡航速度",
-    text: `走破タイム ${formatRaceTime(r.timeMs)}、道中の平均速度 ${t.cruiseSpeed.toFixed(1)}m/秒。${
-      blocked ? `ただし前が詰まった時間が${t.blockedSec.toFixed(1)}秒あり、能力を出し切れていない可能性がある。` : ""
+    title: "走破タイム",
+    cls: "record",
+    text: `走破タイム ${formatRaceTime(r.timeMs)}${lastF !== null ? `、最後の1ハロン ${lastF.toFixed(1)}秒` : ""}（ゲーム内の計測）。${
+      blocked ? "直線で前が壁になる場面があり、力を出し切れていない可能性がある。" : ""
     }`,
     informs: [item("speed", blocked ? 1.6 : 1.0)],
     notInformative: [],
   });
 
-  // 2. 仕掛けと加速
+  // 2. 終いの脚（記録）
+  const move = p400 !== undefined ? `残り400mの${p400}番手から${r.position}着` : `${r.position}着`;
   out.push({
-    title: "仕掛けと終いの脚",
-    text:
-      t.spurtRemain !== null
-        ? `残り${t.spurtRemain}mで仕掛け、上がり3F ${t.last600.toFixed(1)}秒（出走馬中${l3rank}位）。終盤の最高速度は${t.topSpeedLate.toFixed(1)}m/秒。`
-        : `はっきりと仕掛ける場面がなかった。上がり3F ${t.last600.toFixed(1)}秒（出走馬中${l3rank}位）。`,
-    informs: t.spurtRemain !== null ? [item("acceleration", blocked ? 1.5 : 1.0)] : [item("acceleration", 1.8)],
+    title: "終いの脚",
+    cls: "record",
+    text: `上がり3F ${t.last600.toFixed(1)}秒（出走馬中${l3rank}位）。${move}。`,
+    informs: [item("acceleration", blocked ? 1.5 : f("fastLast3f") || f("gainedLate") ? 1.0 : 1.2)],
     notInformative: [],
   });
 
-  // 3. 持久力
-  const stamina: Finding = { title: "終盤の余力", text: "", informs: [], notInformative: [] };
-  if (t.emptyRemain !== null) {
-    stamina.text = `残り${t.emptyRemain}m付近で脚が上がった（エネルギー切れ）。最後の200mの平均速度は${t.lastSegSpeed.toFixed(1)}m/秒。`;
-    stamina.informs.push(item("stamina", 0.9));
-  } else if (D >= 1800) {
-    stamina.text = `${D}mを最後まで脚を残して走り切った。最後の200mは${t.lastSegSpeed.toFixed(1)}m/秒。`;
-    stamina.informs.push(item("stamina", D >= 2200 ? 1.0 : 1.2));
-  } else if (D >= 1500) {
-    stamina.text = `最後まで大きな失速はなかったが、${D}mでは持久力の限界までは分からない。`;
-    stamina.informs.push(item("stamina", 1.7));
-  } else {
-    stamina.text = `${D}mの短距離戦で失速はなかった。`;
+  // 3. 終盤の粘り（記録＋推定）。内部のエネルギー残量は使わず、終盤の順位と区間タイムの推移から見る
+  const stamina: Finding = { title: "終盤の粘り", cls: "record", text: "", informs: [], notInformative: [] };
+  const faded = f("lostLate") || f("finalFurlongSlowed");
+  if (D < 1500) {
+    stamina.text = `${D}mの短距離戦。${faded ? "最後に失速したが、" : ""}この距離ではスタミナまでは判断できない。`;
     stamina.notInformative.push({ key: "stamina", reason: "短距離戦のため、スタミナは判断できない" });
+  } else {
+    const parts: string[] = [];
+    if (f("lostLate")) parts.push(`残り400mの${fact("lostLate")!.params!.from}番手から${r.position}着まで順位を下げた`);
+    if (f("finalFurlongSlowed")) parts.push("最後の1ハロンはその前より明らかに遅かった");
+    if (!faded) parts.push(`${D}mを最後まで大きく失速せずに走った`);
+    let est = "";
+    if (faded) {
+      stamina.cls = "estimate";
+      const others = [f("paceFast") && "前半の速い流れ", f("keen") && "道中の力み", f("wide") && "外を回ったこと"].filter(Boolean);
+      est = others.length
+        ? `持久力の不足だけでなく、${others.join("・")}も影響した可能性があり、原因は一つに絞れない。`
+        : "距離や持久力が影響した可能性もあるが、この1戦だけでは断定できない。";
+    }
+    stamina.text = `${parts.join("。")}。${est}`;
+    stamina.informs.push(item("stamina", D >= 2200 ? 1.0 : D >= 1800 ? 1.2 : 1.7));
   }
   out.push(stamina);
 
-  // 4. 競り合い
+  // 4. 競り合い（観察）
   if (t.duel.occurred) {
     out.push({
       title: "競り合い",
-      text: t.duel.gained ? "ゴール前の競り合いで前に出た。" : "ゴール前で競り合ったが、前に出ることはできなかった。",
+      cls: "observed",
+      text: t.duel.gained ? "ゴール前で他馬と並び、前に出た。" : "ゴール前で他馬と並んだが、前に出ることはできなかった。",
       informs: [item("fightingSpirit", 0.95)],
       notInformative: [],
     });
   } else {
     out.push({
       title: "競り合い",
+      cls: "observed",
       text: "ゴール前で他馬と並ぶ場面はなかった。",
       informs: [],
       notInformative: [{ key: "fightingSpirit", reason: "競り合いがなかったため、根性は判断できない" }],
     });
   }
 
-  // 5. 位置取り・折り合い
+  // 5. 位置取りと折り合い（記録＋観察）
   const posText = t.positions.map((p) => `${p.label}${p.pos}番手`).join(" → ");
   const extras: string[] = [];
-  if (t.keenSec >= 4) extras.push(`道中で${t.keenSec.toFixed(0)}秒ほど行きたがった`);
-  if (t.extraMeters >= 8) extras.push(`外を回って約${t.extraMeters.toFixed(0)}m余分に走った`);
-  if (t.startDelay >= 0.35) extras.push("スタートで少し出遅れた");
+  if (f("keen")) extras.push("騎手によると道中で行きたがる場面があった");
+  if (f("wide")) extras.push("コーナーで外を回る形になった");
+  if (f("slowStart")) extras.push("スタートで後手に回った");
+  if (blocked) extras.push("直線で前が壁になる場面があった");
   out.push({
     title: "位置取りと折り合い",
+    cls: "observed",
     text: `${STYLE_LABELS[t.styleShown]}の位置で運んだ（作戦：${STYLE_LABELS[r.tactics.style]}）。${posText}。${extras.length ? extras.join("、") + "。" : ""}`,
     informs: [item("raceSense", 1.3), item(`style_${t.styleShown}` as KnowledgeKey, 1.2)],
     notInformative: [],
   });
 
-  // 6. レースの流れ（ラップの前半・後半と、先頭争いの有無。再設計前の記録にはペースの情報がないので出さない）
-  if (r.pace && r.leaderLaps.length >= 4) {
+  // 6. レースの流れ（推定）：記録されたラップの前後半の差を、距離ごとの平均的な差と比べる
+  if (d.pace && r.leaderLaps.length >= 4) {
     const L = r.leaderLaps.slice(1); // 発走直後の200mは加速中なので除く
     const h = Math.floor(L.length / 2);
     const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-    const first = avg(L.slice(0, h));
-    const second = avg(L.slice(L.length - h));
-    const label = r.pace.label === "high" ? "速い流れ" : r.pace.label === "slow" ? "落ち着いた流れ" : "平均的な流れ";
+    const label = d.pace === "fast" ? "前半が速い流れ" : d.pace === "slow" ? "前半が落ち着いた流れ" : "平均的な流れ";
     out.push({
       title: "レースの流れ",
-      text: `先頭の200mごとのラップ（発走直後を除く）は前半平均${first.toFixed(1)}秒、後半平均${second.toFixed(1)}秒。${
-        r.pace.battleSec >= 5 ? "序盤に複数の馬が先頭を争った。" : ""
-      }全体としては${label}だったとみられる。`,
+      cls: "estimate",
+      text: `先頭の200mごとのラップ（発走直後を除く）は前半平均${avg(L.slice(0, h)).toFixed(1)}秒、後半平均${avg(L.slice(L.length - h)).toFixed(1)}秒。この距離の平均的な形と比べると、${label}だったとみられる。`,
       informs: [],
       notInformative: [],
     });
   }
 
   // 7. 条件
-  const cond: Finding = { title: "条件", text: "", informs: [], notInformative: [] };
+  const cond: Finding = { title: "条件", cls: "record", text: "", informs: [], notInformative: [] };
   const band = bandForDistance(D);
   const surfaceKey: KnowledgeKey = r.course.surface === "turf" ? "surface_turf" : "surface_dirt";
   cond.informs.push(item(band.key, 1.0), item(surfaceKey, 1.0));
@@ -192,9 +212,16 @@ export function analyzeRace(r: OwnerRaceRecord): Finding[] {
     cond.informs.push(item("course_tight", 1.5));
     notes.push("小回り");
   }
-  cond.text = `${notes.join("・")}。着順と走りの内容から、この条件への向き不向きを判断する材料になる。`;
+  cond.text = `${notes.join("・")}。1戦だけで向き不向きは決められないが、判断材料の一つになる。`;
   out.push(cond);
   return out;
+}
+
+/** 自分の最後の1ハロンのタイム（200mごとの通過記録から。距離が200mで割り切れないときは null） */
+export function finalFurlong(r: OwnerRaceRecord): number | null {
+  const sp = r.telemetry.splits;
+  if (r.course.distance % 200 !== 0 || sp.length < 2) return null;
+  return Math.round((r.timeMs / 1000 - sp[sp.length - 2]) * 10) / 10;
 }
 
 /** 分析で得られる情報の一覧（同じ項目が複数あれば確かな方を使う） */
@@ -235,9 +262,10 @@ export function raceTraitChecks(r: OwnerRaceRecord): { trait: TraitId; opportuni
 export function raceTraitSignChance(trait: TraitId, r: OwnerRaceRecord, has: boolean): number {
   const t = r.telemetry;
   if (!has) {
-    // 本当は持っていなくても、たまたまそう見えることがある
-    if (trait === "keen") return t.keenSec >= 4 ? 0.5 : 0.02;
-    return 0.02;
+    // 個性を持たない馬に、根拠のない兆候は作らない。
+    // ただし実際に行きたがる走りをした（騎手の報告がある）ときは、その事実から兆候と受け取られることがある
+    if (trait === "keen") return t.keenSec >= 4 ? 0.5 : 0;
+    return 0;
   }
   switch (trait) {
     case "keen":

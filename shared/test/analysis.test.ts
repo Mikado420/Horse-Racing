@@ -147,3 +147,98 @@ test("ラップから見た流れは、記録されたラップだけで決ま�
   // 事実の抽出に内部の値を書き換えても影響しない
   for (const r of pool.slice(0, 20)) assert.deepEqual(extractFacts(scrambleInternals(r, 2), pool), extractFacts(r, pool));
 });
+
+/* ---------------- 情報の公開範囲 ---------------- */
+import { analyzeRace, finalFurlong, keyObservations } from "../src/index";
+
+test("分析画面の項目に、観測できない内部の数値（速度・エネルギー・仕掛け地点・内部の距離や秒数）が出ない", () => {
+  for (const r of pool) {
+    const findings = analyzeRace(r, pool);
+    for (const f of findings) {
+      assert.ok(["record", "observed", "estimate"].includes(f.cls));
+      assert.ok(!/m\/秒|エネルギー|脚が上が|仕掛け[たて]|余分に|秒ほど|秒あった/.test(f.text), `${f.title}：${f.text}`);
+    }
+    // 内部の数値を書き換えても、分析の内容は変わらない
+    assert.deepEqual(analyzeRace(scrambleInternals(r, 1), pool), findings);
+    for (const o of keyObservations(diagnoseRace(r, pool))) assert.ok(!/\d+(\.\d+)?(m|秒)/.test(o.text.replace(/残り400m/, "")), o.text);
+  }
+});
+
+test("上がり3F・最後の1ハロン・ラップは元の記録と一致する（区間タイムの合計＝走破タイム）", () => {
+  for (const r of pool) {
+    const t = r.telemetry;
+    const D = r.course.distance;
+    if (D % 200 === 0) {
+      // 200mごとの通過時刻の最後はゴール時刻（ミリ秒の丸めの範囲で一致）
+      assert.ok(Math.abs(t.splits[t.splits.length - 1] - r.timeMs / 1000) <= 0.01, `${r.raceId} ${t.splits[t.splits.length - 1]} vs ${r.timeMs}`);
+      const ff = finalFurlong(r)!;
+      assert.ok(Math.abs(ff - (t.splits[t.splits.length - 1] - t.splits[t.splits.length - 2])) <= 0.06);
+      // 上がり3F＝ゴール時刻−残り600m通過時刻（残り600mは200mごとの通過記録の1つ）
+      const at600 = t.splits[D / 200 - 4];
+      assert.ok(Math.abs(t.last600 - (r.timeMs / 1000 - at600)) <= 0.02, `${r.raceId} 上がり ${t.last600} vs ${r.timeMs / 1000 - at600}`);
+    }
+    // 区間タイムは正の値で、合計は通過時刻に一致する
+    const laps = t.splits.map((x, i) => x - (i ? t.splits[i - 1] : 0));
+    assert.ok(laps.every((x) => x > 8 && x < 25), JSON.stringify(laps));
+    // 通過順位は1〜頭数、ゴールの順位は着順と一致
+    for (const p of t.positions) assert.ok(p.pos >= 1 && p.pos <= r.fieldSize);
+    const goal = t.positions.find((p) => p.remain === 0);
+    if (goal) assert.equal(goal.pos, r.position);
+    // 出走馬の着順は1から順に並ぶ
+    assert.deepEqual(r.field.map((f) => f.position), r.field.map((_, i) => i + 1));
+  }
+});
+
+test("記録が足りないときは、数値や断定を作らない（短距離・距離が200mで割り切れない・ラップが少ない）", () => {
+  const r = pool[0];
+  const short: OwnerRaceRecord = { ...r, course: { ...r.course, distance: 1300 }, leaderLaps: r.leaderLaps.slice(0, 3) };
+  assert.equal(finalFurlong(short), null);
+  const f = analyzeRace(short, []);
+  assert.ok(!f.some((x) => x.title === "レースの流れ"));
+  assert.ok(f.find((x) => x.title === "終盤の粘り")!.notInformative.some((n) => n.key === "stamina"));
+  assert.ok(!/最後の1ハロン \d/.test(f[0].text));
+});
+
+/* ---------------- 厩舎の報告 ---------------- */
+import { OBS_COMMENT, TRAIT_IDS, WEEKS_PER_YEAR, createRaceHorse, createRng, findTrainer, runStableWeek } from "../src/index";
+
+test("厩舎の報告は、持っていない個性の兆候を作らない", () => {
+  for (let seed = 1; seed <= 6; seed++) {
+    let h = createRaceHorse({ id: `h${seed}`, name: "テスト", ownerId: "me", trainerId: "t1", week: WEEKS_PER_YEAR * 2, age: 2, quality: { potMean: 60, potSd: 5 }, purchasePrice: 0 }, createRng(seed));
+    const rng = createRng(seed * 31);
+    for (let w = 0; w < 60; w++) h = runStableWeek({ ...h, state: { ...h.state, fatigue: 0, injuryWeeks: 0 } }, findTrainer("t3")!, WEEKS_PER_YEAR * 2 + w, rng).horse;
+    for (const t of TRAIT_IDS) {
+      if (h.truth.traits.includes(t)) continue;
+      assert.equal(h.knowledge.traits[t]?.signs ?? 0, 0, `${seed}：持っていない「${t}」の兆候が記録された`);
+    }
+  }
+});
+
+test("厩舎の観察コメントは、積み上げた見立てに沿っていて、週ごとに正反対のことを言わない", () => {
+  let flips = 0;
+  let total = 0;
+  for (let seed = 1; seed <= 6; seed++) {
+    let h = createRaceHorse({ id: `h${seed}`, name: "テスト", ownerId: "me", trainerId: "t1", week: WEEKS_PER_YEAR * 2, age: 2, quality: { potMean: 60, potSd: 8 }, purchasePrice: 0 }, createRng(seed));
+    const rng = createRng(seed * 17);
+    const last: Record<string, number> = {};
+    for (let w = 0; w < 80; w++) {
+      const out = runStableWeek({ ...h, state: { ...h.state, fatigue: 0, injuryWeeks: 0 } }, findTrainer("t2")!, WEEKS_PER_YEAR * 2 + w, rng);
+      h = out.horse;
+      const text = out.report.lines.join(" ");
+      for (const [key, levels] of Object.entries(OBS_COMMENT)) {
+        const lv = levels.findIndex((x) => text.includes(x));
+        if (lv < 0) continue;
+        if (w >= 20 && last[key] !== undefined) {
+          total++;
+          if (Math.abs(lv - last[key]) === 2) flips++;
+        }
+        last[key] = lv;
+        // 見立てが固まっていないときは、そう添える
+        const e = h.knowledge.entries[key as keyof typeof OBS_COMMENT];
+        if (e.uncertainty > 8.5) assert.ok(text.includes(`${levels[lv]}（まだ見極め中）`), text);
+      }
+    }
+  }
+  assert.ok(total >= 20, `比較できた回数 ${total}`);
+  assert.equal(flips, 0, `正反対の評価に変わった回数 ${flips}/${total}`);
+});

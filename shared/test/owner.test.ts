@@ -842,9 +842,10 @@ test("出走記録にペースと各馬の走りの記録が残り、分析で�
   assert.ok(rec.telemetry.reserve!.every((x) => x >= 0 && x <= 1));
   const flow = analyzeRace(rec).find((f) => f.title === "レースの流れ");
   assert.ok(flow && /前半平均[\d.]+秒、後半平均[\d.]+秒/.test(flow.text), flow?.text);
-  // 古い記録（ペースなし）でも分析が動く
+  // 古い記録（ペースなし）でも分析が動き、レースの流れは公開されたラップだけから同じように判定される
+  //（分析再設計で、内部のペース指数ではなくラップから判定するように変更）
   const old = { ...rec, pace: undefined, telemetry: { ...rec.telemetry, reserve: undefined, fadeRemain: undefined, leadBattleSec: undefined } };
-  assert.ok(!analyzeRace(old).some((f) => f.title === "レースの流れ"));
+  assert.deepEqual(analyzeRace(old).find((f) => f.title === "レースの流れ"), flow);
 });
 
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {

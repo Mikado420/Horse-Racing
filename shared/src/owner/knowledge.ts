@@ -285,7 +285,8 @@ export function addEvidence(
         week: now,
         key,
         type: "stage",
-        text: next.stage === "numeric" ? `${label}の数値が判明：${summary(next)}` : `${label}の評価が判明：${summary(next)}`,
+        // 開示されるのは推定（見立て）であり、真の値そのものではない
+        text: next.stage === "numeric" ? `${label}の見立てが数値で示せるまで固まった：${summary(next)}` : `${label}の見立てが評価で示せるまで固まった：${summary(next)}`,
         source: sourceLabel,
       });
     }
@@ -344,7 +345,7 @@ export function recordTraitSign(
         week,
         key: trait,
         type: "trait",
-        text: status === "confirmed" ? `個性が判明：「${label}」` : `個性の兆候：「${label}」かもしれない`,
+        text: status === "confirmed" ? `個性の見立てが固まった：「${label}」` : `個性の兆候：「${label}」かもしれない`,
         source: sourceLabel,
       });
     }
