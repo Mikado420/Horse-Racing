@@ -63,7 +63,11 @@ function useNavStack(): Nav {
   useLayoutEffect(() => {
     if (stack.length < prevLen.current) {
       const pos = scrolls.current[stack.length - 1];
-      if (pos) requestAnimationFrame(() => restoreScroll(pos));
+      // 画面の中身がそろってから戻す（直後と、少し後の2回）
+      if (pos) {
+        requestAnimationFrame(() => restoreScroll(pos));
+        setTimeout(() => restoreScroll(pos), 80);
+      }
     }
     prevLen.current = stack.length;
   }, [stack]);

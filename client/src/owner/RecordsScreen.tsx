@@ -46,7 +46,7 @@ import { ScreenHead } from "./AppShell";
 import { useOwner, type RecordsTab, type Route } from "./context";
 import { EmptyState, useBusy, useToast } from "./feedback";
 import { Icon } from "./icons";
-import { Pane, StanceTag, Tabs, trainerName, yen, yenSigned } from "./ui";
+import { Pane, StanceTag, Tabs, marginSa, trainerName, yen, yenSigned } from "./ui";
 
 type RecordsRoute = Extract<Route, { tab: "records" }>;
 
@@ -179,7 +179,7 @@ function RaceHistory({ horseId }: { horseId?: string }) {
                 <small>／{r.fieldSize}頭</small>
               </td>
               <td className="num">{formatRaceTime(r.timeMs)}</td>
-              <td>{r.position === 1 ? `${marginLabel(Math.abs(r.marginToWinner))}差勝ち` : marginLabel(r.marginToWinner)}</td>
+              <td>{r.position === 1 ? `${marginSa(Math.abs(r.marginToWinner))}で勝利` : marginLabel(r.marginToWinner)}</td>
               <td className="num">
                 {r.telemetry.last600.toFixed(1)}
                 <small>{last600Rank(r)}位</small>
@@ -309,7 +309,7 @@ function Analysis({ raceId }: { raceId?: string }) {
               </div>
               <div>
                 <dt>着差</dt>
-                <dd>{f.won ? `${marginLabel(f.margin)}差で勝利` : `勝ち馬から${marginLabel(f.margin)}`}</dd>
+                <dd>{f.won ? `${marginSa(f.margin)}で勝利` : `勝ち馬から${marginLabel(f.margin)}`}</dd>
               </div>
               <div>
                 <dt>作戦</dt>

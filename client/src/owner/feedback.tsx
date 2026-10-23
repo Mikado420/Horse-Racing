@@ -91,12 +91,54 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * ダイアログ・シートのフォーカス管理：開いたら中へ移し、Tab で外へ出ないようにし、閉じたら元の場所へ戻す
+ */
+function useDialogFocus(ref: { current: HTMLElement | null }) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const before = document.activeElement as HTMLElement | null;
+    const items = () => (Array.from(el.querySelectorAll(FOCUSABLE)) as HTMLElement[]).filter((x) => x.offsetParent !== null || x === document.activeElement);
+    // 閉じるボタンではなく、本文の最初の操作か、ダイアログそのものに合わせる
+    //（autoFocus で中の操作にすでに合っていれば、それを尊重する）
+    if (!el.contains(document.activeElement)) {
+      const first = items().find((x) => !x.matches(".sheet-head .icon-btn")) ?? el;
+      if (first === el) el.setAttribute("tabindex", "-1");
+      first.focus({ preventScroll: true });
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const list = items();
+      if (list.length === 0) return;
+      const a = list[0];
+      const z = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === a) {
+        e.preventDefault();
+        z.focus();
+      } else if (!e.shiftKey && document.activeElement === z) {
+        e.preventDefault();
+        a.focus();
+      }
+    };
+    el.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("keydown", onKey);
+      if (before && document.contains(before)) before.focus({ preventScroll: true });
+    };
+  }, [ref]);
+}
+
 export function ModalDialog({ title, onClose, children, labelledBy, wide }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string; wide?: boolean }) {
   useEscape(onClose);
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogFocus(ref);
   const id = labelledBy ?? "dialog-title";
   return createPortal(
     <div className="scrim" onClick={onClose}>
-      <div className={`dialog ${wide ? "is-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} className={`dialog ${wide ? "is-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id} onClick={(e) => e.stopPropagation()}>
         <h2 id={id} className="dialog-title">
           {title}
         </h2>
@@ -110,10 +152,12 @@ export function ModalDialog({ title, onClose, children, labelledBy, wide }: { ti
 /** 下から出るシート。横向きの低い画面では右側から出るパネルになる（CSSで切り替え） */
 export function BottomSheet({ title, onClose, children, actions }: { title: string; onClose: () => void; children: ReactNode; actions?: ReactNode }) {
   useEscape(onClose);
+  const ref = useRef<HTMLElement>(null);
+  useDialogFocus(ref);
   // 画面の重なり（牧場の景色の上の部品など）に関係なく、いちばん手前に出す
   return createPortal(
     <div className="scrim scrim-sheet" onClick={onClose}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <section ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <header className="sheet-head">
           <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="閉じる">
