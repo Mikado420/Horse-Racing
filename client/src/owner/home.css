@@ -1,0 +1,338 @@
+/* ホーム（UI v4）：競馬新聞の一面のように、状況 → 優先タスク → 愛馬 → 出来事 を紙面に並べる */
+.screen.home4 {
+  display: grid;
+  gap: var(--gap);
+  padding: var(--pad);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "band" "status" "tasks" "horses" "events" "actions";
+  align-content: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  overflow-y: auto;
+}
+.home-band {
+  grid-area: band;
+  position: relative;
+  height: 96px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+/* 絵は横長の帯に合わせて縦を切り出す（柵と馬の高さが帯の中央に来るように） */
+.home-band .pasture-scene {
+  position: absolute;
+  inset: auto 0 auto 0;
+  top: 50%;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 2;
+  transform: translateY(-66%);
+}
+.band-horses {
+  position: absolute;
+  inset: auto 0 6px 0;
+  display: flex;
+  justify-content: center;
+  gap: 18%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.band-horses li {
+  width: 64px;
+}
+.home-status {
+  grid-area: status;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px double var(--ink);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.status-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 18px;
+  margin: 0;
+}
+.status-grid dt {
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+.status-grid dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+}
+.status-grid dd small {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+.panel4 {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 14px 12px;
+  min-width: 0;
+}
+.panel4-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 2px solid var(--ink);
+  margin: 0 -2px 8px;
+  padding: 8px 2px 6px;
+}
+.panel4-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+}
+.home-tasks {
+  grid-area: tasks;
+}
+.home-horses {
+  grid-area: horses;
+}
+.home-events {
+  grid-area: events;
+}
+.home-actions {
+  grid-area: actions;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 8px 0 calc(4px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--paper) 70%, transparent);
+}
+.btn-nextb {
+  min-height: 48px;
+  padding: 0 1.4rem;
+  font-size: 1.02rem;
+  gap: 6px;
+}
+.btn-next4b {
+  min-height: 48px;
+}
+
+/* 愛馬の状況：1頭1行。狭い画面では2段に折り返す */
+.horse-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.horse-lines li + li {
+  border-top: 1px solid var(--line);
+}
+.horse-line {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1.4fr) auto minmax(0, 0.8fr) minmax(0, 1.3fr);
+  grid-template-areas: "fig main state form next";
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 2px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  min-height: 56px;
+}
+.horse-line:hover {
+  background: var(--paper);
+}
+.hl-fig {
+  grid-area: fig;
+  width: 52px;
+  height: 40px;
+  display: block;
+}
+.hl-fig svg {
+  width: 100%;
+  height: 100%;
+}
+.hl-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hl-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.hl-sub {
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hl-state {
+  grid-area: state;
+}
+.hl-form {
+  grid-area: form;
+  display: flex;
+  gap: 3px;
+}
+.form-pos {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.form-pos.is-win {
+  border-color: var(--brass);
+  background: #f7efd9;
+}
+.form-pos.is-place {
+  border-color: var(--ink-2);
+}
+.hl-next {
+  grid-area: next;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+.hl-rep {
+  display: none;
+}
+
+/* 最近の出来事 */
+.event-feed {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.event-feed li {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px dotted var(--line);
+  font-size: 0.9rem;
+}
+.ev-week {
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+.ev-race .ev-text strong {
+  color: var(--turf);
+}
+.home-events .voice {
+  margin: 0 0 4px;
+}
+
+/* PC・タブレット：2段組 */
+@media (min-width: 900px) {
+  .screen.home4 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    grid-template-areas:
+      "band band"
+      "status status"
+      "tasks horses"
+      "events horses"
+      "actions actions";
+  }
+  .home-band {
+    height: 110px;
+  }
+}
+/* 縦向きスマホ：愛馬の行を2段に */
+@media (max-width: 719px) {
+  .horse-line {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "fig main state"
+      "fig form next";
+  }
+  .hl-next {
+    text-align: right;
+    font-size: 0.8rem;
+  }
+  .home-actions {
+    justify-content: stretch;
+  }
+  .home-actions .btn {
+    flex: 1;
+  }
+  .btn-next4b {
+    flex: 0 0 auto !important;
+  }
+}
+/* 横向きスマホ（高さが低い）：絵の帯は出さず、2段組で縦スクロールを減らす */
+@media (max-height: 500px) and (orientation: landscape) {
+  .home-band {
+    display: none;
+  }
+  .screen.home4 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-areas:
+      "status status"
+      "tasks horses"
+      "events horses"
+      "actions actions";
+    gap: 8px;
+    padding: 8px var(--pad);
+  }
+  .home-status {
+    padding: 6px 10px;
+  }
+  .status-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  .horse-line {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "fig main state"
+      "fig form next";
+    min-height: 48px;
+  }
+}
+
+/* 調教師のひとことは紙面の中に置く（以前の牧場画面の浮いた吹き出しにしない） */
+.home-events .voice {
+  position: static;
+  max-width: none;
+  right: auto;
+  backdrop-filter: none;
+  box-shadow: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+/* 優先タスクは1行ずつ簡潔に */
+.home-tasks .todo {
+  padding: 6px 8px 6px 10px;
+}
+.home-tasks .todo-text strong {
+  font-size: 0.98rem;
+}
+@media (max-width: 719px) {
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-status {
+    flex-direction: column;
+  }
+  .home-status > .btn {
+    align-self: flex-end;
+  }
+}

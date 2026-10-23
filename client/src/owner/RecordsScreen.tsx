@@ -46,7 +46,7 @@ import { ScreenHead } from "./AppShell";
 import { useOwner, type RecordsTab, type Route } from "./context";
 import { EmptyState, useBusy, useToast } from "./feedback";
 import { Icon } from "./icons";
-import { Pane, StanceTag, Tabs, trainerName, yen, yenSigned } from "./ui";
+import { Pane, StanceTag, Tabs, marginSa, trainerName, yen, yenSigned } from "./ui";
 
 type RecordsRoute = Extract<Route, { tab: "records" }>;
 
@@ -65,9 +65,9 @@ export function RecordsScreen({ route }: { route: RecordsRoute }) {
   return (
     <div className="screen">
       <div className="head-tabs">
-        <ScreenHead nav={nav} title="記録・分析" />
+        <ScreenHead nav={nav} title="記録" />
         <Tabs<RecordsTab>
-          label="記録・分析"
+          label="記録"
           value={sub}
           items={tabs}
           onChange={(t) => nav.replace({ tab: "records", sub: t, raceId: route.raceId, horseId: route.horseId })}
@@ -142,7 +142,63 @@ function RaceHistory({ horseId }: { horseId?: string }) {
           {races.length}戦{races.filter((r) => r.position === 1).length}勝
         </span>
       </div>
-      <ul className="rcards">
+      <table className="paper-table result-table only-wide">
+        <caption className="sr-only">戦績</caption>
+        <thead>
+          <tr>
+            <th scope="col">日付</th>
+            <th scope="col">馬名</th>
+            <th scope="col">レース・条件</th>
+            <th scope="col">着順</th>
+            <th scope="col">タイム</th>
+            <th scope="col">着差</th>
+            <th scope="col">上がり3F</th>
+            <th scope="col">位置取り</th>
+            <th scope="col">賞金</th>
+            <th scope="col">
+              <span className="sr-only">分析</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {races.slice(0, 80).map((r) => (
+            <tr key={r.raceId} onClick={() => nav.push({ tab: "records", sub: "analysis", raceId: r.raceId })}>
+              <td className="num">{shortWeekLabel(r.week)}</td>
+              <th scope="row" className="rt-horse">
+                {r.horseName}
+              </th>
+              <td>
+                {r.programName}
+                <small>
+                  {r.course.trackName} {SURFACE_LABELS[r.course.surface]}
+                  {r.course.distance}m・{GOING_LABELS[r.going]}
+                </small>
+              </td>
+              <td className={`num rt-pos ${r.position === 1 ? "is-win" : ""}`}>
+                {r.position}
+                <small>／{r.fieldSize}頭</small>
+              </td>
+              <td className="num">{formatRaceTime(r.timeMs)}</td>
+              <td>{r.position === 1 ? `${marginSa(Math.abs(r.marginToWinner))}で勝利` : marginLabel(r.marginToWinner)}</td>
+              <td className="num">
+                {r.telemetry.last600.toFixed(1)}
+                <small>{last600Rank(r)}位</small>
+              </td>
+              <td>
+                {STYLE_LABELS[r.telemetry.styleShown]}
+                <small>作戦 {STYLE_LABELS[r.tactics.style]}</small>
+              </td>
+              <td className="num">{r.prize > 20_000 ? <span className="gold-num">{yen(r.prize)}</span> : yen(r.prize)}</td>
+              <td>
+                <button className="btn btn-small btn-ghost" onClick={(e) => (e.stopPropagation(), nav.push({ tab: "records", sub: "analysis", raceId: r.raceId }))}>
+                  {r.analyzed ? "分析を見る" : "分析する"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ul className="rcards only-narrow">
         {races.slice(0, 80).map((r) => (
           <li key={r.raceId}>
             <RaceCard r={r} onOpen={() => nav.push({ tab: "records", sub: "analysis", raceId: r.raceId })} />
@@ -253,7 +309,7 @@ function Analysis({ raceId }: { raceId?: string }) {
               </div>
               <div>
                 <dt>着差</dt>
-                <dd>{f.won ? `${marginLabel(f.margin)}差で勝利` : `勝ち馬から${marginLabel(f.margin)}`}</dd>
+                <dd>{f.won ? `${marginSa(f.margin)}で勝利` : `勝ち馬から${marginLabel(f.margin)}`}</dd>
               </div>
               <div>
                 <dt>作戦</dt>

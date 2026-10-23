@@ -4,6 +4,12 @@
 import {
   ABILITY_KEYS,
   CLASS_DEFS,
+  DISTANCE_BANDS,
+  PLAN_DEFS,
+  proposePlan,
+  type HorsePolicy,
+  STYLE_LABELS,
+  STYLE_KEYS,
   activeHorses,
   ageAt,
   bandForDistance,
@@ -28,7 +34,8 @@ import {
 } from "@owners/shared";
 
 export type Importance = "urgent" | "check" | "normal";
-export const IMPORTANCE_LABELS: Record<Importance, string> = { urgent: "緊急", check: "要確認", normal: "通常" };
+/** 重要度の表示。期限や条件のないものを急ぎ扱いしない（要対応＝放っておくと問題が起きる、確認＝判断の機会、お知らせ＝情報） */
+export const IMPORTANCE_LABELS: Record<Importance, string> = { urgent: "要対応", check: "確認", normal: "お知らせ" };
 
 export type ReportKind = "injury" | "discovery" | "proposal" | "warning" | "training";
 export const REPORT_KIND_LABELS: Record<ReportKind, string> = {
@@ -58,7 +65,9 @@ export function classifyReport(r: WeeklyReport, read: ReadonlySet<string>, curre
   const proposal = r.lines.find((l) => l.startsWith("提案：")) ?? null;
   const injury = r.alerts.some((a) => /痛め|故障/.test(a));
   const kind: ReportKind = injury ? "injury" : r.alerts.length ? "warning" : r.discoveries.length ? "discovery" : proposal ? "proposal" : "training";
-  const importance: Importance = injury ? "urgent" : r.alerts.length || r.discoveries.length || proposal ? "check" : "normal";
+  // 提案は回答できる週だけ「確認」。新しい見立ては情報なので「お知らせ」
+  const replyable = !!proposal && r.week === currentWeek - 1;
+  const importance: Importance = injury ? "urgent" : r.alerts.length || replyable ? "check" : "normal";
   const obs = r.lines.find((l) => l.startsWith("観察："));
   const summary = injury
     ? r.alerts[0]
@@ -192,7 +201,7 @@ export function todos(save: OwnerSave, vm: OwnerVM): TodoItem[] {
     out.push({ id: "reply", importance: "check", title: `調教師の提案 ${replies.length}件`, detail: replies[0].summary, action: { label: "回答する", to: "report", arg: replies[0].id } });
   const found = vm.reports.filter((r) => r.unread && r.report.discoveries.length);
   if (found.length)
-    out.push({ id: "found", importance: "check", title: "新しい能力情報", detail: found[0].report.discoveries[0], horseId: found[0].report.horseId, action: { label: "見立てを見る", to: "horse", arg: found[0].report.horseId } });
+    out.push({ id: "found", importance: "normal", title: "新しい能力の見立て", detail: found[0].report.discoveries[0], horseId: found[0].report.horseId, action: { label: "見立てを見る", to: "horse", arg: found[0].report.horseId } });
   if (save.player.money < 0)
     out.push({ id: "money", importance: "urgent", title: "所持金がマイナス", detail: "売却や出走で資金を立て直してください", action: { label: "所有馬", to: "horse" } });
   if (vm.horses.length === 0)
@@ -294,3 +303,104 @@ export function marketVM(save: OwnerSave, offers = save.market.offers) {
   return offers.map((o) => ({ offerId: o.offerId, price: o.price, age: ageAt(o.horse, save.week), view: toHorseView(o.horse, save.week) }));
 }
 export type OfferVM = ReturnType<typeof marketVM>[number];
+
+
+/* ---------------- 愛馬の一覧・ホーム用のまとめ ---------------- */
+
+export interface HorseRowVM {
+  /** 直近の着順（新しい順、最大5走） */
+  form: number[];
+  /** 見立てで合いそうな脚質（記号つき。見立てがなければ null） */
+  style: string | null;
+  /** 主な適性（見立てで ◎・○ の距離帯と馬場） */
+  apt: string[];
+}
+
+const GOOD_MARKS = ["◎", "○"];
+
+/** 一覧に出す要点。すべて見立て（推定）と記録からで、真の値は使わない */
+export function horseRow(save: OwnerSave, v: HorseView): HorseRowVM {
+  const form = save.races.filter((r) => r.horseId === v.id).slice(0, 5).map((r) => r.position);
+  let style: string | null = null;
+  for (const st of STYLE_KEYS) {
+    const k = v.knowledge[`style_${st}` as KnowledgeKey];
+    if (k.mark && GOOD_MARKS.includes(k.mark) && (!style || k.mark === "◎")) style = `${STYLE_LABELS[st]}${k.mark}`;
+  }
+  const apt: string[] = [];
+  for (const b of DISTANCE_BANDS) {
+    const k = v.knowledge[b.key];
+    if (k.mark && GOOD_MARKS.includes(k.mark)) apt.push(`${b.label}${k.mark}`);
+  }
+  for (const [key, label] of [["surface_turf", "芝"], ["surface_dirt", "ダート"]] as const) {
+    const k = v.knowledge[key];
+    if (k.mark && GOOD_MARKS.includes(k.mark)) apt.push(`${label}${k.mark}`);
+  }
+  return { form, style, apt };
+}
+
+export interface EventVM {
+  week: number;
+  horseId: string;
+  horseName: string;
+  kind: "race" | "knowledge" | "owner";
+  text: string;
+  raceId?: string;
+}
+
+/** 最近の出来事（レース・見立ての変化・売買など）。古いものと調教の細かい記録は出さない */
+export function recentEvents(save: OwnerSave, limit = 6, weeks = 8): EventVM[] {
+  const out: EventVM[] = [];
+  for (const h of save.horses) {
+    for (const e of h.log) {
+      if (e.week < save.week - weeks) continue;
+      if (e.kind !== "race" && e.kind !== "knowledge" && e.kind !== "owner") continue;
+      out.push({ week: e.week, horseId: h.id, horseName: h.name, kind: e.kind, text: e.text, raceId: e.raceId });
+    }
+  }
+  return out.sort((a, b) => b.week - a.week || (a.kind === "race" ? -1 : 0)).slice(0, limit);
+}
+
+
+/* ---------------- 調教（育成方針）の見込み ---------------- */
+
+export interface PlanPreviewVM {
+  label: string;
+  reason: string;
+  /** 調教師が馬の状態を見て、方針と違う内容にしそうか */
+  adjusted: boolean;
+  /** 方針を優先させるため、調教師の懸念を押し切ることになるか */
+  overridden: boolean;
+}
+
+/**
+ * この方針にしたとき、今週厩舎が組む調教の見込み（ゲームの規則どおりに判定。結果の数値や能力は出さない）
+ */
+export function planPreview(save: OwnerSave, horseId: string, policy: HorsePolicy): PlanPreviewVM | null {
+  const h = save.horses.find((x) => x.id === horseId);
+  if (!h || h.status !== "active") return null;
+  const goal = policy.goalRaceId ? findProgramById(policy.goalRaceId) : undefined;
+  const p = proposePlan({ ...h, policy }, save.week, goal ? goal.week - save.week : null);
+  return { label: PLAN_DEFS[p.plan].label, reason: p.reason, adjusted: p.adjusted, overridden: p.overridden };
+}
+
+
+/* ---------------- 今週の番組（レースから選ぶ） ---------------- */
+
+export interface ProgramRowVM {
+  program: OwnerProgram;
+  /** このレースに出られる愛馬と、調教師の意見 */
+  horses: { id: string; name: string; stance: TrainerOpinion["stance"] }[];
+}
+
+/** 今週の番組と、それぞれに出られる愛馬（出走条件はゲームの規則どおり。出られない馬は載せない） */
+export function programOverview(save: OwnerSave, vm: OwnerVM): ProgramRowVM[] {
+  return thisWeekCard(save).map((p) => ({
+    program: p,
+    horses: vm.horses
+      .filter((h) => {
+        const raw = save.horses.find((x) => x.id === h.view.id)!;
+        return !entryProblem(save, raw, p);
+      })
+      .map((h) => ({ id: h.view.id, name: h.view.name, stance: trainerOpinion(save, h.view.id, p.id).stance })),
+  }));
+}

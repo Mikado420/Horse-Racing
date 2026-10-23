@@ -11,10 +11,10 @@ import { blockerLabel } from "../pwa/policy";
 
 export const NAV_ITEMS: [NavTab, string, IconName][] = [
   ["home", "ホーム", "home"],
-  ["horses", "所有馬", "horse"],
+  ["horses", "愛馬", "horse"],
   ["stable", "厩舎", "stable"],
-  ["race", "出走", "race"],
-  ["records", "記録・分析", "chart"],
+  ["race", "レース", "race"],
+  ["records", "記録", "chart"],
 ];
 
 export interface StatusInfo {

@@ -40,11 +40,68 @@ test("報告の重要度と未確認の判定", () => {
   assert.equal(injured.kind, "injury");
 });
 
-test("重要事項は緊急 → 要確認 → 通常の順に並ぶ", () => {
+test("重要事項は要対応 → 確認 → お知らせの順に並ぶ", () => {
   const s = played();
   const tired = { ...s, horses: s.horses.map((h) => ({ ...h, state: { ...h.state, fatigue: 75 } })) };
   const list = todos(tired, buildVM(tired, new Set()));
   assert.equal(list[0].importance, "urgent");
   const order = { urgent: 0, check: 1, normal: 2 } as const;
   for (let i = 1; i < list.length; i++) assert.ok(order[list[i].importance] >= order[list[i - 1].importance]);
+});
+
+/* ---------------- UI v4 の表示用データ ---------------- */
+import { IMPORTANCE_LABELS, horseRow, planPreview, programOverview, recentEvents } from "../src/owner/vm";
+import { POLICY_IDS, entryProblem as _entryProblem, thisWeekCard as _card } from "@owners/shared";
+
+test("UI v4 の表示用データ（愛馬の行・最近の出来事・調教の見込み・番組）に非公開データが含まれない", () => {
+  const s = played();
+  const vm = buildVM(s, new Set());
+  const h = s.horses[0];
+  const all = JSON.stringify({
+    rows: vm.horses.map((x) => horseRow(s, x.view)),
+    events: recentEvents(s, 20, 100),
+    plans: POLICY_IDS.map((p) => planPreview(s, h.id, { ...h.policy, policy: p })),
+    programs: programOverview(s, vm),
+  });
+  for (const b of BANNED) assert.ok(!all.includes(b), `${b} が含まれている`);
+});
+
+test("重要度の表示は 要対応／確認／お知らせ。新しい見立ては急ぎ扱いしない", () => {
+  assert.deepEqual(IMPORTANCE_LABELS, { urgent: "要対応", check: "確認", normal: "お知らせ" });
+  const s = played();
+  const vm = buildVM(s, new Set());
+  for (const t of todos(s, vm)) if (t.id === "found" || t.id === "analysis") assert.equal(t.importance, "normal");
+  // 回答できない（前の週以前の）提案だけの報告は「お知らせ」
+  const r = s.reports.find((x) => x.lines.some((l) => l.startsWith("提案："))) ?? { ...s.reports[0], lines: ["提案：テスト"], alerts: [], discoveries: [] };
+  const old = classifyReport({ ...r, alerts: [], discoveries: [], week: s.week - 5 }, new Set(), s.week);
+  assert.equal(old.importance, "normal");
+});
+
+test("愛馬の行：近走は記録の着順（新しい順）、適性は見立ての ◎・○ だけ", () => {
+  const s = played();
+  const vm = buildVM(s, new Set());
+  const v = vm.horses[0].view;
+  const row = horseRow(s, v);
+  assert.deepEqual(row.form, s.races.filter((r) => r.horseId === v.id).slice(0, 5).map((r) => r.position));
+  for (const a of row.apt) assert.match(a, /[◎○]$/);
+});
+
+test("番組の一覧に載る馬は、出走条件を満たす馬だけ", () => {
+  const s = played();
+  const vm = buildVM(s, new Set());
+  for (const row of programOverview(s, vm)) {
+    for (const h of row.horses) assert.equal(_entryProblem(s, s.horses.find((x) => x.id === h.id)!, row.program), null);
+  }
+  assert.equal(programOverview(s, vm).length, _card(s).length);
+});
+
+test("調教の見込みはゲームの規則どおり：疲れていれば休ませ、方針を優先させると押し切る", () => {
+  const s = played();
+  const h = s.horses[0];
+  const tired = { ...s, horses: s.horses.map((x) => (x.id === h.id ? { ...x, racedWeek: null, state: { ...x.state, fatigue: 75, injuryWeeks: 0 } } : x)) };
+  const follow = planPreview(tired, h.id, { ...h.policy, policy: "strengthen", mode: "follow" })!;
+  assert.equal(follow.adjusted, true);
+  assert.equal(follow.label, "休養");
+  const insist = planPreview(tired, h.id, { ...h.policy, policy: "strengthen", mode: "insist" })!;
+  assert.equal(insist.overridden, true);
 });
