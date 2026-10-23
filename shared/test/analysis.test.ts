@@ -67,6 +67,11 @@ test("コメントは着順・位置取り・ラップの記録と矛盾しな�
     if (early) assert.equal(Number(early[1]), r.telemetry.positions[0].pos, text);
     // 勝った馬に敗因めいた見解を付けない
     if (r.position === 1) for (const v of diagnoseRace(r, pool).views) assert.ok(["goodRun", "paceSuitedFront"].includes(v.id), v.id);
+    // 勝ち馬から5馬身以上離されたのに「力は出せた」とは言わない
+    if (r.marginToWinner >= 5) {
+      assert.ok(!diagnoseRace(r, pool).views.some((v) => v.id === "goodRun"), `${r.raceId} ${r.marginToWinner}`);
+      assert.ok(!/力は出せた|内容は悪くありません/.test(text), text);
+    }
   }
 });
 

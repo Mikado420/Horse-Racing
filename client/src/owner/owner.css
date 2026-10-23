@@ -3059,3 +3059,22 @@ button.offer2 {
   .status-save:not(.is-error) { display: none; }
   .status-money { font-size: 0.98rem; }
 }
+
+/* 分析：情報の分類（記録・観察・推定・提案）の札。色だけでなく文字で区別する */
+.cls-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  vertical-align: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cls-record { color: var(--ink, #1f2a1f); }
+.cls-observed { color: #2d6a4f; }
+.cls-estimate { color: #8a5a00; border-style: dashed; }
+.cls-proposal { color: #3b5b8a; border-style: dotted; }
+.obs-list { list-style: none; margin: 0.4rem 0 0.8rem; padding: 0; display: grid; gap: 0.45rem; }
+.obs-list li { line-height: 1.55; }

@@ -78,8 +78,8 @@ const VIEW_TEXT: Record<ViewId, { moderate: readonly string[]; weak: readonly st
     weak: ["作戦どおりの位置は取れませんでした", "思っていた位置では運べませんでした"],
   },
   outclassed: {
-    moderate: ["離されてしまいました。今回の相手には、まだ力の差があった可能性があります"],
-    weak: ["今回の相手には、まだ力の差があったかもしれません"],
+    moderate: ["勝ち馬からは大きく離され、終いも伸びませんでした。今回の相手には、まだ力の差があった可能性があります"],
+    weak: ["勝ち馬とは差がありました。今回の相手には、まだ力の差があったかもしれません"],
   },
   undetermined: {
     moderate: ["今回の結果だけでは、はっきりした原因は分かりません"],
@@ -172,6 +172,8 @@ export function keyObservations(diag: RaceDiagnosis, max = 3): { id: FactId; cls
   for (const id of FACT_ORDER) {
     const f = diag.facts.find((x) => x.id === id);
     if (!f || !FACT_SHORT[id]) continue;
+    // 出遅れても序盤に先頭へ立った場合は、総評では位置取りの方を優先する（詳細には両方残る）
+    if (id === "slowStart" && diag.facts.some((x) => x.id === "ledEarly")) continue;
     out.push({ id, cls: f.cls, text: fill(FACT_SHORT[id]!, f.params) });
     if (out.length >= max) break;
   }

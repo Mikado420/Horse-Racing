@@ -194,8 +194,9 @@ export function judgeViews(r: OwnerRaceRecord, facts: Fact[]): View[] {
   const views: View[] = [];
   const add = (id: ViewId, basis: FactId[]) => views.push({ id, basis, strength: basis.length >= 2 ? "moderate" : "weak" });
   const f = (id: FactId) => has(facts, id);
-  const good = f("topThree") || f("closeFinish");
-  if (good) add("goodRun", f("topThree") ? ["topThree"] : ["closeFinish"]);
+  // 上位に来ても勝ち馬から大きく離されていれば「力を出せた」とは言わない
+  const good = f("closeFinish") || (f("topThree") && !f("beatenFar"));
+  if (good) add("goodRun", f("closeFinish") ? ["closeFinish"] : ["topThree"]);
 
   if (!good) {
     if (f("paceFast") && (f("ledEarly") || r.telemetry.styleShown === "front" || r.telemetry.styleShown === "stalker") && (f("lostLate") || f("finalFurlongSlowed")))
@@ -208,7 +209,7 @@ export function judgeViews(r: OwnerRaceRecord, facts: Fact[]): View[] {
     if ((f("lostLate") || f("finalFurlongSlowed")) && (f("firstAtDistance") || f("longestYet")) && !f("paceFast") && !f("keen"))
       views.push({ id: "distanceQuestion", basis: [f("lostLate") ? "lostLate" : "finalFurlongSlowed", f("firstAtDistance") ? "firstAtDistance" : "longestYet"], strength: "weak" });
     // 大きく負けて上がりも遅く、ほかに説明となる出来事がない
-    if (f("beatenFar") && f("slowLast3f") && !f("blocked") && !f("keen") && !f("wide") && !f("paceFast")) add("outclassed", ["beatenFar", "slowLast3f"]);
+    if (f("beatenFar") && !f("blocked") && !f("keen") && !f("wide") && !f("paceFast")) add("outclassed", f("slowLast3f") ? ["beatenFar", "slowLast3f"] : ["beatenFar"]);
     if (f("positionDiffered") && !f("slowStart")) add("tacticsMismatch", ["positionDiffered"]);
     else if (f("positionDiffered") && f("slowStart")) add("tacticsMismatch", ["positionDiffered", "slowStart"]);
   } else if (f("paceSlow") && (f("ledEarly") || r.telemetry.styleShown === "front")) {
