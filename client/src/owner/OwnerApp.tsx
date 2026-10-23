@@ -26,7 +26,7 @@ import { APP_VERSION, takeUpdatedFlag, useUpdateState } from "../pwa/update";
 const TAB_ROOT: Record<NavTab, Route> = {
   home: { tab: "home" },
   horses: { tab: "horses" },
-  stable: { tab: "stable", sub: "reports" },
+  stable: { tab: "stable", sub: "training" },
   race: { tab: "race" },
   records: { tab: "records", sub: "races" },
 };

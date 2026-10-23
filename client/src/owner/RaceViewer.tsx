@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GOING_LABELS,
+  HORSE_LENGTH,
   PACE_LABELS,
   SPURT_LABELS,
   STYLE_LABELS,
@@ -176,7 +177,7 @@ export function RaceViewer({ running, onExit }: { running: RunningRace; onExit: 
                     <span className="mini-rank">{rank + 1}</span>
                     <SaddleCloth gate={r.gate} size="sm" />
                     <span className="mini-name">{r.horseName}</span>
-                    <span className="mini-gap">{rank === 0 ? "" : `−${(dist[order[0]] - dist[idx]).toFixed(1)}m`}</span>
+                    <span className="mini-gap">{rank === 0 ? "先頭" : `先頭から${marginLabel((dist[order[0]] - dist[idx]) / HORSE_LENGTH)}`}</span>
                   </li>
                 );
               })}

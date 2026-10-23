@@ -349,7 +349,7 @@ function EventRow({ e }: { e: HorseView["knowledgeEvents"][number] }) {
 }
 
 function Care({ v }: { v: HorseView }) {
-  const { save } = useOwner();
+  const { save, nav } = useOwner();
   const last = save.reports.find((r) => r.horseId === v.id);
   return (
     <div className="cols">
@@ -367,11 +367,23 @@ function Care({ v }: { v: HorseView }) {
           </div>
         )}
       </Pane>
-      <Pane title="育成方針">
+      <Pane title="調教（育成方針）">
         {v.status === "active" ? (
           <>
-            <p className="hint2">方針は調教の命令ではなく、厩舎が計画を立てるときの優先事項です。</p>
-            <PolicyEditor horseId={v.id} compact />
+            <dl className="facts compact">
+              <div>
+                <dt>育成方針</dt>
+                <dd>{POLICY_DEFS[v.policy.policy].label}</dd>
+              </div>
+              <div>
+                <dt>提案の扱い</dt>
+                <dd>{v.policy.mode === "follow" ? "調教師の提案に従う" : "方針を優先"}</dd>
+              </div>
+            </dl>
+            <button className="btn btn-primary" onClick={() => nav.push({ tab: "stable", sub: "training", horseId: v.id })}>
+              <Icon name="stable" />
+              調教の依頼を変更する
+            </button>
           </>
         ) : (
           <p className="muted">現役の馬ではありません。</p>

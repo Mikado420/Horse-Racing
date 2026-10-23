@@ -254,11 +254,11 @@ export function OwnerHome() {
       <section className="home-events panel4" aria-labelledby="h-events">
         <header className="panel4-head">
           <h2 id="h-events">最近の出来事</h2>
-          <button className="link2" onClick={() => nav.switchTab("stable")}>
+          <button className="link2" onClick={() => nav.push({ tab: "stable", sub: "reports" })}>
             厩舎の報告{unread.length ? `（未確認 ${unread.length}）` : ""}
           </button>
         </header>
-        <TrainerVoice latest={latest} unread={0} onOpen={openReport} onAll={() => nav.switchTab("stable")} />
+        <TrainerVoice latest={latest} unread={0} onOpen={openReport} onAll={() => nav.push({ tab: "stable", sub: "reports" })} />
         {events.length === 0 ? (
           <p className="muted">ここ最近の出来事はまだありません。</p>
         ) : (
@@ -296,7 +296,7 @@ export function OwnerHome() {
                 className="btn btn-ghost"
                 onClick={() => {
                   setSummary(null);
-                  nav.switchTab("stable");
+                  nav.push({ tab: "stable", sub: "reports" });
                 }}
               >
                 報告を読む
