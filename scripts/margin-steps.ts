@@ -2,11 +2,12 @@
 // 「変更前の設定」から、変更を1つずつ積み上げた場合と、1つだけ入れた場合の両方を表示する。
 //   npx tsx scripts/margin-steps.ts [出力.json]
 import fs from "node:fs";
-import { DEFAULT_CONFIG, LEGACY_RACE_V20, withConfig, type GameConfig } from "../shared/src/index";
+import { LEGACY_RACE_V20, RACE_V21, withConfig, type GameConfig } from "../shared/src/index";
 import { collect, summarize } from "./margin-stats";
 
 type Race = Partial<GameConfig["race"]>;
-const now = DEFAULT_CONFIG.race;
+// v2.1 の調整を一つずつ積み上げる（既定の計算は v3 になったので、v2.1 の設定を基準にする）
+const now = withConfig({ race: RACE_V21 }).race;
 const STEPS: [string, Race][] = [
   ["① 馬群について行く", { followRange: now.followRange, followMaxFraction: now.followMaxFraction }],
   ["② エネルギーの配分（有酸素分・配分）", { aerobicRate: now.aerobicRate, energyScale: now.energyScale, staminaPacing: now.staminaPacing }],

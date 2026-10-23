@@ -1,6 +1,7 @@
 // 馬主モード（指示書 v1.4）のバランス設定ファイル。
 // 情報解明の開示条件・評価ランクの境界・距離適性の補正・観測の精度などはすべてここで調整する。
 // ゲームロジックは引数で設定を受け取れるので、テストや将来のサーバーから別の設定を渡せる。
+import { DEFAULT_SIM_TUNING, type SimTuning } from "./simTuning";
 
 export interface RankBand {
   rank: "S" | "A" | "B" | "C" | "D" | "E";
@@ -92,6 +93,15 @@ export interface GameConfig {
     cruisePerKm: number;
     /** スタートのばらつき（出遅れ）の大きさの倍率 */
     startDelayScale: number;
+    /**
+     * レース計算の版。"v3" は脚質・ペース・先頭争い・仕掛け・進路を扱う現行の計算（sim.ts）、
+     * "v21" は着差の調整（docs/margins）時点の計算（simLegacy.ts。比較・過去の再現用）。
+     * followRange・followMaxFraction・staminaPacing・followOverPace・duelTaper は v21 の仕組みで、
+     * v3 では同じ役割を tuning（流れへの追従・巡航・競り合い・消耗）が受け持つため使わない
+     */
+    engine: "v3" | "v21";
+    /** 脚質・ペース・先頭争い・仕掛け・進路などレース展開の調整値（simTuning.ts） */
+    tuning: SimTuning;
   };
 }
 
@@ -138,6 +148,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     longSpeed: 0.012,
   },
   race: {
+    engine: "v3",
     hz: 10,
     sampleDt: 0.25,
     topBase: 16.6,
@@ -146,20 +157,49 @@ export const DEFAULT_CONFIG: GameConfig = {
     fatiguePerPoint: 0.0008,
     fitnessWeight: 0.05,
     surfaceFit: 0.06,
-    formSd: 0.009,
-    emptyFloor: 0.89,
-    fadeReserve: 0.1,
+    formSd: 0.011,
+    emptyFloor: 0.86,
+    fadeReserve: 0.18,
+    energyScale: 0.9,
+    differenceScale: 0.5,
+    startDelayScale: 0.5,
+    aerobicRate: 7.9,
+    cruisePerKm: 0.05,
+    // 以下は v21 の仕組み（v3 では使わない。上の engine の説明を参照）
     followRange: 20,
     followMaxFraction: 0.97,
     staminaPacing: 1,
-    aerobicRate: 7.9,
-    energyScale: 0.565,
     duelTaper: 1,
-    differenceScale: 0.5,
     followOverPace: 1.02,
-    cruisePerKm: 0.05,
-    startDelayScale: 0.5,
+    tuning: DEFAULT_SIM_TUNING,
   },
+};
+
+/**
+ * 着差の調整（docs/margins）時点、v2.1 のレース計算と同じ動きになる race 設定。
+ * withConfig({ race: RACE_V21 }) で、同じシードから v2.1 の結果をそのまま再現できる（比較・検証用）
+ */
+export const RACE_V21: Partial<GameConfig["race"]> = {
+  engine: "v21",
+  topBase: 16.6,
+  topPerSpeed: 0.034,
+  conditionPerLevel: 0.012,
+  fatiguePerPoint: 0.0008,
+  fitnessWeight: 0.05,
+  surfaceFit: 0.06,
+  formSd: 0.009,
+  emptyFloor: 0.89,
+  fadeReserve: 0.1,
+  followRange: 20,
+  followMaxFraction: 0.97,
+  staminaPacing: 1,
+  aerobicRate: 7.9,
+  energyScale: 0.565,
+  duelTaper: 1,
+  differenceScale: 0.5,
+  followOverPace: 1.02,
+  cruisePerKm: 0.05,
+  startDelayScale: 0.5,
 };
 
 /**
@@ -167,6 +207,7 @@ export const DEFAULT_CONFIG: GameConfig = {
  * withConfig({ race: LEGACY_RACE_V20 }) で、同じシードから変更前の結果をそのまま再現できる（比較・検証用）
  */
 export const LEGACY_RACE_V20: Partial<GameConfig["race"]> = {
+  ...RACE_V21,
   fadeReserve: 0,
   followRange: 0,
   followMaxFraction: 0,

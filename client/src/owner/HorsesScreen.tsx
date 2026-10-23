@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   ABILITY_KEYS,
   DISTANCE_BANDS,
+  POLICY_DEFS,
   GOING_LABELS,
   SURFACE_LABELS,
   STYLE_LABELS,
@@ -36,7 +37,7 @@ import {
   trainerName,
   yen,
 } from "./ui";
-import { currentClassLabel, economyOf, type HorseCardVM, type ReportVM } from "./vm";
+import { currentClassLabel, economyOf, horseRow, type HorseCardVM, type ReportVM } from "./vm";
 import { COAT_LABELS, HorseFigure, coatOf } from "./art";
 
 type HorsesRoute = Extract<Route, { tab: "horses" }>;
@@ -53,7 +54,7 @@ function HorseList({ selectedId }: { selectedId?: string }) {
   return (
     <div className="screen">
       <ScreenHead
-        title="所有馬"
+        title="愛馬"
         sub={`現役 ${vm.horses.length}頭${retired.length ? `／引退・売却 ${retired.length}頭` : ""}`}
         right={
           <button className="btn btn-ghost btn-small" onClick={() => nav.push({ tab: "shop" })}>
@@ -68,7 +69,8 @@ function HorseList({ selectedId }: { selectedId?: string }) {
         </EmptyState>
       ) : (
         <div className="scroll horse-scroll">
-          <ul className="horse-grid3">
+          <HorseTable selectedId={selectedId} onOpen={open} />
+          <ul className="horse-grid3 only-narrow">
             {vm.horses.map((h) => (
               <li key={h.view.id}>
                 <HorseSummaryCard h={h} selected={h.view.id === selectedId} onOpen={() => open(h.view.id)} />
@@ -81,12 +83,76 @@ function HorseList({ selectedId }: { selectedId?: string }) {
   );
 }
 
+/** 競馬新聞の馬柱のような一覧（広い画面用）。行を選ぶと詳細へ */
+function HorseTable({ selectedId, onOpen }: { selectedId?: string; onOpen: (id: string) => void }) {
+  const { vm, save } = useOwner();
+  return (
+    <table className="horse-table only-wide">
+      <caption className="sr-only">愛馬の一覧</caption>
+      <thead>
+        <tr>
+          <th scope="col">馬名</th>
+          <th scope="col">性齢・厩舎</th>
+          <th scope="col">状態</th>
+          <th scope="col">脚質（見立て）</th>
+          <th scope="col">主な適性（見立て）</th>
+          <th scope="col">近走</th>
+          <th scope="col">次の予定</th>
+        </tr>
+      </thead>
+      <tbody>
+        {vm.horses.map((h) => {
+          const row = horseRow(save, h.view);
+          return (
+            <tr key={h.view.id} className={h.view.id === selectedId ? "is-selected" : ""} onClick={() => onOpen(h.view.id)}>
+              <th scope="row">
+                <button className="ht-name" onClick={(e) => (e.stopPropagation(), onOpen(h.view.id))}>
+                  <span className="ht-fig" aria-hidden>
+                    <HorseFigure horseId={h.view.id} pose="stand" />
+                  </span>
+                  <span>
+                    <strong>{h.view.name}</strong>
+                    {h.unreadReports > 0 && <small className="ht-rep">報告 {h.unreadReports}件</small>}
+                  </span>
+                </button>
+              </th>
+              <td>
+                {h.view.age}歳
+                <small>{h.trainerName}厩舎</small>
+              </td>
+              <td>
+                <HorseConditionBadge c={h.condition} />
+              </td>
+              <td>{row.style ?? <span className="muted">まだ分からない</span>}</td>
+              <td>{row.apt.length ? row.apt.join("・") : <span className="muted">まだ分からない</span>}</td>
+              <td>
+                {row.form.length ? (
+                  <span className="hl-form">
+                    {row.form.map((p, i) => (
+                      <span key={i} className={`form-pos ${p === 1 ? "is-win" : p <= 3 ? "is-place" : ""}`}>
+                        {p}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="muted">未出走</span>
+                )}
+              </td>
+              <td>{h.nextPlan}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 const TABS: [HorseTab, string][] = [
-  ["overview", "概要"],
-  ["care", "育成・状態"],
+  ["overview", "基本情報"],
   ["ability", "能力・適性"],
-  ["reports", "厩舎報告"],
+  ["care", "状態・調教"],
   ["races", "戦績・分析"],
+  ["reports", "調教師の報告"],
   ["owner", "所有・経営"],
 ];
 
@@ -284,7 +350,7 @@ function EventRow({ e }: { e: HorseView["knowledgeEvents"][number] }) {
 }
 
 function Care({ v }: { v: HorseView }) {
-  const { save } = useOwner();
+  const { save, nav } = useOwner();
   const last = save.reports.find((r) => r.horseId === v.id);
   return (
     <div className="cols">
@@ -302,11 +368,23 @@ function Care({ v }: { v: HorseView }) {
           </div>
         )}
       </Pane>
-      <Pane title="育成方針">
+      <Pane title="調教（育成方針）">
         {v.status === "active" ? (
           <>
-            <p className="hint2">方針は調教の命令ではなく、厩舎が計画を立てるときの優先事項です。</p>
-            <PolicyEditor horseId={v.id} compact />
+            <dl className="facts compact">
+              <div>
+                <dt>育成方針</dt>
+                <dd>{POLICY_DEFS[v.policy.policy].label}</dd>
+              </div>
+              <div>
+                <dt>提案の扱い</dt>
+                <dd>{v.policy.mode === "follow" ? "調教師の提案に従う" : "方針を優先"}</dd>
+              </div>
+            </dl>
+            <button className="btn btn-primary" onClick={() => nav.push({ tab: "stable", sub: "training", horseId: v.id })}>
+              <Icon name="stable" />
+              調教の依頼を変更する
+            </button>
           </>
         ) : (
           <p className="muted">現役の馬ではありません。</p>

@@ -3141,3 +3141,13 @@ button.offer2 {
 .compare-races li.is-me {
   background: #fff6dc;
 }
+
+/* タブ：狭い画面でも横スクロールの奥に隠さず、折り返して全部見せる */
+.tabs-row {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  row-gap: 0;
+}
+.tabs-row button {
+  min-height: 40px;
+}

@@ -1,13 +1,14 @@
-// 馬主ホーム「オーナーズ・デスク」：今週の判断 → 注目馬 → 厩舎報告 → 週送り
-import { useState, type CSSProperties } from "react";
-import { findProgramById, type WeeklyReport } from "@owners/shared";
+// ホーム：今週の状況 → 優先タスク → 愛馬の状況 → 最近の出来事 → 次の週へ（競馬新聞の一面のように、要点を上から）
+import { useState } from "react";
+import { findProgramById, shortWeekLabel, weekLabel, type WeeklyReport } from "@owners/shared";
+import "./home.css";
 import { useOwner } from "./context";
 import { BottomSheet, EmptyState, useBusy, useConfirm, useToast } from "./feedback";
 import { HorseFigure, PastureScene, SEASON_LABELS, seasonOf, type HorsePose } from "./art";
 import { Icon } from "./icons";
 import { ReportSheet } from "./actions";
 import { ImportanceTag, trainerName, yen, yenSigned } from "./ui";
-import { todos, type TodoItem, type ReportVM } from "./vm";
+import { horseRow, recentEvents, todos, type TodoItem, type ReportVM } from "./vm";
 
 export function TodoList({ items, onAct, variant = "list" }: { items: TodoItem[]; onAct?: () => void; variant?: "list" | "cards" }) {
   const { nav, vm } = useOwner();
@@ -104,7 +105,6 @@ export function OwnerHome() {
   const unread = vm.reports.filter((r) => r.unread);
   const latest = [...vm.reports].sort((a, b) => b.report.week - a.report.week)[0];
   const placed = vm.horses.slice(0, SPOTS.length).map((h, i) => ({ h, spot: SPOTS[i] }));
-  const more = vm.horses.length - placed.length;
 
   const advance = (weeks: number) =>
     run(async () => {
@@ -132,79 +132,156 @@ export function OwnerHome() {
   };
   const openHorse = (id: string) => nav.push({ tab: "horses", horseId: id, detail: true, horseTab: "overview" });
 
+  const events = recentEvents(save, 6);
+  const nextGoal = vm.horses
+    .map((h) => (h.view.policy.goalRaceId ? findProgramById(h.view.policy.goalRaceId) : undefined))
+    .filter((g): g is NonNullable<typeof g> => !!g && g.week >= save.week)
+    .sort((x, y) => x.week - y.week)[0];
+  const ready = vm.horses.filter((h) => h.runnable > 0 && h.view.racedWeek !== save.week).length;
+  const lastRace = save.races[0];
   return (
-    <div className="screen home3" data-season={season}>
-      <section className="home-scene" aria-label={`牧場（${SEASON_LABELS[season]}）`}>
+    <div className="screen home4" data-season={season}>
+      <section className="home-band" aria-hidden>
         <PastureScene season={season} />
-        <p className="home-meta">
-          <span>
-            <Icon name="horse" size={14} />
-            現役 {vm.horses.length}頭
-          </span>
-          <span>
-            預託料 <strong>{yen(vm.fees)}</strong>／週
-          </span>
-        </p>
+        <ul className="band-horses">
+          {placed.slice(0, 4).map(({ h, spot }) => (
+            <li key={h.view.id}>
+              <HorseFigure horseId={h.view.id} pose={spot.pose} flip={spot.flip} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="home-status" aria-label="今週の状況">
+        <h2 className="sr-only">今週の状況</h2>
+        <dl className="status-grid">
+          <div>
+            <dt>日付</dt>
+            <dd>
+              {weekLabel(save.week)}
+              <small>（{SEASON_LABELS[season]}）</small>
+            </dd>
+          </div>
+          <div>
+            <dt>所持金</dt>
+            <dd className={`num ${save.player.money < 0 ? "minus2" : ""}`}>{yen(save.player.money)}</dd>
+          </div>
+          <div>
+            <dt>現役の馬</dt>
+            <dd className="num">
+              {vm.horses.length}頭<small>預託料 {yen(vm.fees)}／週</small>
+            </dd>
+          </div>
+          <div>
+            <dt>今週の予定</dt>
+            <dd>
+              {ready > 0 ? `出走できる馬 ${ready}頭` : "今週の出走予定なし"}
+              {nextGoal && <small>目標 {nextGoal.name}（あと{nextGoal.week - save.week}週）</small>}
+            </dd>
+          </div>
+          {lastRace && (
+            <div>
+              <dt>最近のレース</dt>
+              <dd>
+                <button className="link2" onClick={() => nav.push({ tab: "records", sub: "analysis", raceId: lastRace.raceId })}>
+                  {lastRace.horseName} {lastRace.programName} {lastRace.position}着
+                </button>
+              </dd>
+            </div>
+          )}
+        </dl>
+        <button className="btn btn-ghost btn-small" onClick={() => nav.push({ tab: "shop" })}>
+          <Icon name="cart" size={16} />
+          馬を買う
+        </button>
+      </section>
+
+      <section className="home-tasks panel4" aria-labelledby="h-tasks">
+        <header className="panel4-head">
+          <h2 id="h-tasks">優先タスク</h2>
+          <span className="muted">{items.length ? `${items.length}件` : ""}</span>
+        </header>
+        <TodoList items={items} />
+      </section>
+
+      <section className="home-horses panel4" aria-labelledby="h-horses">
+        <header className="panel4-head">
+          <h2 id="h-horses">愛馬の状況</h2>
+          <button className="link2" onClick={() => nav.switchTab("horses")}>
+            一覧へ
+          </button>
+        </header>
         {vm.horses.length === 0 ? (
           <div className="home-empty">
-            <p>牧場に馬がいません</p>
+            <p>現役の馬がいません。</p>
             <button className="btn btn-primary" onClick={() => nav.push({ tab: "shop" })}>
               <Icon name="cart" />
               馬を買う
             </button>
           </div>
         ) : (
-          <ul className="paddock" aria-label="所有馬">
-            {placed.map(({ h, spot }) => (
-              <li
-                key={h.view.id}
-                className="paddock-spot"
-                style={{ "--x": spot.x, "--y": `${spot.y}%`, "--yp": `${spot.yp}%`, "--s": spot.s, zIndex: Math.round(spot.y) } as CSSProperties}
-              >
-                <button className="paddock-horse" onClick={() => openHorse(h.view.id)} aria-label={`${h.view.name}（${h.condition.label}）の詳細`}>
-                  <span className={`paddock-tag tag-${h.condition.level}`}>
-                    <span className="paddock-name">{h.view.name}</span>
-                    {h.unreadReports > 0 && (
-                      <span className="paddock-rep" title={`未確認の報告 ${h.unreadReports}件`}>
-                        <Icon name="report" size={12} />
-                        {h.unreadReports}
+          <ul className="horse-lines">
+            {vm.horses.map((h) => {
+              const row = horseRow(save, h.view);
+              return (
+                <li key={h.view.id}>
+                  <button className="horse-line" onClick={() => openHorse(h.view.id)} aria-label={`${h.view.name}の詳細`}>
+                    <span className="hl-fig" aria-hidden>
+                      <HorseFigure horseId={h.view.id} pose="stand" />
+                    </span>
+                    <span className="hl-main">
+                      <strong className="hl-name">{h.view.name}</strong>
+                      <span className="hl-sub">
+                        {h.view.age}歳／{h.trainerName}厩舎／{h.view.record.races}戦{h.view.record.wins}勝
                       </span>
-                    )}
-                  </span>
-                  <HorseFigure horseId={h.view.id} pose={spot.pose} flip={spot.flip} />
-                </button>
-              </li>
-            ))}
-            {more > 0 && (
-              <li className="paddock-more">
-                <button className="link2" onClick={() => nav.switchTab("horses")}>
-                  ほか{more}頭
-                </button>
-              </li>
-            )}
+                    </span>
+                    <span className="hl-state">
+                      <ImportanceTag level={h.condition.level} label={h.condition.label} />
+                    </span>
+                    <span className="hl-form" aria-label={row.form.length ? `近走 ${row.form.join("・")}着` : "出走なし"}>
+                      {row.form.length ? row.form.map((p, i) => <span key={i} className={`form-pos ${p === 1 ? "is-win" : p <= 3 ? "is-place" : ""}`}>{p}</span>) : <span className="muted">未出走</span>}
+                    </span>
+                    <span className="hl-next">{h.nextPlan}</span>
+                    {h.unreadReports > 0 && <span className="hl-rep">報告 {h.unreadReports}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
-        <TrainerVoice latest={latest} unread={unread.length} onOpen={openReport} onAll={() => nav.switchTab("stable")} />
       </section>
 
-      <aside className="home-todo" aria-label="今週の判断">
-        <header className="home-todo-head">
-          <h2>今週の判断</h2>
-          <span>{items.length ? `${items.length}件` : ""}</span>
+      <section className="home-events panel4" aria-labelledby="h-events">
+        <header className="panel4-head">
+          <h2 id="h-events">最近の出来事</h2>
+          <button className="link2" onClick={() => nav.push({ tab: "stable", sub: "reports" })}>
+            厩舎の報告{unread.length ? `（未確認 ${unread.length}）` : ""}
+          </button>
         </header>
-        <div className="home-todo-body scroll">
-          <TodoList items={items} variant="cards" />
-        </div>
-      </aside>
+        <TrainerVoice latest={latest} unread={0} onOpen={openReport} onAll={() => nav.push({ tab: "stable", sub: "reports" })} />
+        {events.length === 0 ? (
+          <p className="muted">ここ最近の出来事はまだありません。</p>
+        ) : (
+          <ol className="event-feed">
+            {events.map((e, i) => (
+              <li key={i} className={`ev-${e.kind}`}>
+                <span className="ev-week">{shortWeekLabel(e.week)}</span>
+                <span className="ev-text">
+                  <strong>{e.horseName}</strong> {e.text}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
-      <div className="home-next">
-        <button className="btn-next4" disabled={busy || vm.horses.length === 0} onClick={() => advance(4)}>
-          4週
-          <small>まとめて</small>
+      <div className="home-actions">
+        <button className="btn btn-ghost btn-next4b" disabled={busy || vm.horses.length === 0} onClick={() => advance(4)}>
+          4週まとめて進める
         </button>
-        <button className="btn-next" disabled={busy || vm.horses.length === 0} onClick={() => advance(1)} aria-busy={busy} aria-label="1週進める">
-          {busy ? <span className="spinner" aria-hidden /> : <Icon name="next" size={26} />}
-          <span className="btn-next-label">次の週へ</span>
+        <button className="btn btn-primary btn-nextb" disabled={busy || vm.horses.length === 0} onClick={() => advance(1)} aria-busy={busy}>
+          {busy ? <span className="spinner" aria-hidden /> : <Icon name="next" size={20} />}
+          次の週へ進める
         </button>
       </div>
 
@@ -219,7 +296,7 @@ export function OwnerHome() {
                 className="btn btn-ghost"
                 onClick={() => {
                   setSummary(null);
-                  nav.switchTab("stable");
+                  nav.push({ tab: "stable", sub: "reports" });
                 }}
               >
                 報告を読む

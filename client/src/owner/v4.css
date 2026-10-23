@@ -1,0 +1,299 @@
+/* UI v4：競馬場の案内板 × 競馬新聞 × 馬主の執務室。既存のスタイルの上に、統一のための規則を足す */
+
+/* ---- 広い画面だけ／狭い画面だけ ---- */
+@media (max-width: 959px) {
+  .only-wide {
+    display: none !important;
+  }
+}
+@media (min-width: 960px) {
+  .only-narrow {
+    display: none !important;
+  }
+}
+
+/* ---- 表（馬柱・番組表・結果表に共通） ---- */
+.horse-table,
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px double var(--ink);
+  font-size: 0.92rem;
+}
+.horse-table th,
+.horse-table td,
+.paper-table th,
+.paper-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.horse-table thead th,
+.paper-table thead th {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+  white-space: nowrap;
+}
+.horse-table td small,
+.paper-table td small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
+.horse-table tbody tr {
+  cursor: pointer;
+}
+.horse-table tbody tr:hover,
+.horse-table tbody tr.is-selected {
+  background: #f7f5ee;
+}
+.ht-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.ht-name strong {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  display: block;
+}
+.ht-fig {
+  width: 56px;
+  height: 42px;
+  flex: none;
+}
+.ht-fig svg {
+  width: 100%;
+  height: 100%;
+}
+.ht-rep {
+  display: block;
+  color: var(--turf);
+  font-size: 0.76rem;
+}
+.horse-scroll .horse-table {
+  margin-bottom: 12px;
+}
+
+/* ---- 馬の詳細（縦向き）：要点を先に、姿は小さく後ろに ---- */
+@media (max-width: 699px), (orientation: portrait) and (max-width: 900px) {
+  .dossier > .dossier-portrait {
+    order: 3;
+    min-height: 170px;
+  }
+  .dossier > .dossier-profile {
+    order: 1;
+  }
+  .dossier > .dossier-status {
+    order: 2;
+  }
+}
+
+/* ---- 厩舎：調教の依頼 ---- */
+.horse-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 12px;
+}
+.horse-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 48px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.horse-chip strong {
+  font-family: var(--font-display);
+}
+.horse-chip small {
+  color: var(--ink-2);
+  font-size: 0.76rem;
+}
+.horse-chip[aria-checked="true"] {
+  border: 2px solid var(--c-brand);
+  background: #eef4ef;
+  padding: 5px 13px;
+}
+.horse-chip[aria-checked="true"] strong::before {
+  content: "✓ ";
+}
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 8px;
+  font-size: 0.98rem;
+}
+.step-no {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--c-brand);
+  color: #fff;
+  font-size: 0.8rem;
+}
+.policy-now {
+  margin-left: 6px;
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border: 1px solid var(--ink-2);
+  border-radius: 4px;
+  color: var(--ink-2);
+  font-weight: 400;
+}
+.policy-confirm {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--c-brand);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--paper);
+}
+.policy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- レース：出走までの段階 ---- */
+.entry-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 4px;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+.entry-steps li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.es-no {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-2);
+  font-size: 0.72rem;
+}
+.entry-steps li.is-done {
+  color: var(--ok, #287a52);
+}
+.entry-steps li.is-done .es-no {
+  border-color: currentColor;
+}
+.entry-steps li.is-now {
+  color: var(--ink);
+  font-weight: 700;
+}
+.entry-steps li.is-now .es-no {
+  background: var(--c-brand);
+  border-color: var(--c-brand);
+  color: #fff;
+}
+
+/* ---- レース：今週の番組 ---- */
+.program-table th[scope="row"] {
+  min-width: 10em;
+}
+.pt-name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+}
+.program-table .pill {
+  margin-right: 4px;
+}
+.program-table tr.is-off {
+  color: var(--ink-2);
+}
+.pt-horses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pt-horses .btn {
+  gap: 6px;
+}
+/* 狭い画面では1レースを1枚のカードにして、見出しを添える（横スクロールさせない） */
+@media (max-width: 959px) {
+  .program-table thead {
+    display: none;
+  }
+  .program-table,
+  .program-table tbody,
+  .program-table tr,
+  .program-table th,
+  .program-table td {
+    display: block;
+    width: 100%;
+  }
+  .program-table tr {
+    border-bottom: 2px solid var(--line);
+    padding: 6px 0;
+  }
+  .program-table th,
+  .program-table td {
+    border-bottom: none;
+    padding: 3px 10px;
+  }
+  .program-table td[data-label]::before {
+    content: attr(data-label) "：";
+    color: var(--ink-2);
+    font-size: 0.8rem;
+  }
+  .program-table td small {
+    display: inline;
+    margin-left: 6px;
+  }
+}
+
+/* ---- 記録：結果欄 ---- */
+.result-table tbody tr {
+  cursor: pointer;
+}
+.result-table tbody tr:hover {
+  background: #f7f5ee;
+}
+.rt-horse {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.rt-pos {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+.rt-pos.is-win {
+  color: #8a6a1f;
+}
+.rt-pos small {
+  display: inline !important;
+  font-weight: 400;
+}

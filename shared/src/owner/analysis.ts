@@ -7,7 +7,7 @@ import type { Going, RunningStyle } from "../types";
 import { bandForDistance } from "./aptitude";
 import type { OwnerCourse } from "./courses";
 import { KNOWLEDGE_LABELS, type KnowledgeKey } from "./model";
-import type { RunnerTelemetry, Tactics } from "./sim";
+import type { RacePace, RunnerTelemetry, Tactics } from "./sim";
 import type { ClassId } from "./racecard";
 import { STYLE_LABELS, GOING_LABELS } from "../types";
 import { formatRaceTime } from "../race";
@@ -45,6 +45,8 @@ export interface OwnerRaceRecord {
   field: FieldRow[];
   telemetry: RunnerTelemetry;
   leaderLaps: number[];
+  /** レース全体のペース（レース計算の内部の判定。レース計算の再設計以降の記録のみ。分析の表示には使わない） */
+  pace?: RacePace;
   trainerComment: string;
   analyzed: boolean;
 }

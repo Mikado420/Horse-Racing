@@ -9,6 +9,7 @@ export * from "./trainers";
 export * from "./growth";
 export * from "./horsegen";
 export * from "./sim";
+export * from "./simTuning";
 export * from "./racecard";
 export * from "./analysis";
 export * from "./stable";

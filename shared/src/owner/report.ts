@@ -26,18 +26,19 @@ import { PACE_LABELS, SPURT_LABELS } from "./sim";
  * ペース：「前半の200mあたり平均 − 後半の200mあたり平均」（スタート直後の200mは発馬の加速を含むので除く）を、
  * 同じ距離帯のレースと比べて判断する。基準は、このゲームのレース1,292回（4年分の番組・CPU馬8頭立て）を計算して決めた。
  * 距離帯ごとに下位15%を「前半が速い流れ」、上位15%を「前半がゆったりした流れ」とする。
- * （着差の調整 v2.1 で道中の運び方が変わったため、同じ方法で計算し直した。docs/margins を参照）
- *   短距離（〜1400m）  15%点 0.15秒・中央値 0.29秒・85%点 0.45秒（n=487）
- *   マイル（〜1800m）  15%点 0.18秒・中央値 0.27秒・85%点 0.39秒（n=346）
- *   中距離（〜2400m）  15%点 0.17秒・中央値 0.29秒・85%点 0.44秒（n=325）
- *   長距離（2500m〜）  15%点 0.13秒・中央値 0.36秒・85%点 0.63秒（n=134）
+ * （着差の調整 v2.1、レース計算の再設計 v3 で道中の運び方が変わったため、そのたびに同じ方法で計算し直した。docs/margins・docs/race-sim を参照）
+ *   v3：短距離（〜1400m）  15%点 0.33秒・中央値 0.63秒・85%点 0.90秒（n=487）
+ *       マイル（〜1800m）  15%点 0.12秒・中央値 0.46秒・85%点 0.75秒（n=353）
+ *       中距離（〜2400m）  15%点 0.00秒・中央値 0.35秒・85%点 0.70秒（n=324）
+ *       長距離（2500m〜）  15%点 -0.03秒・中央値 0.29秒・85%点 0.64秒（n=128）
+ *   （v2.1 では順に 0.15/0.45・0.18/0.39・0.17/0.44・0.13/0.63）
  */
 export const ANALYSIS_RULES = {
   pace: [
-    { maxDistance: 1400, fastBelow: 0.15, slowAbove: 0.45 },
-    { maxDistance: 1800, fastBelow: 0.18, slowAbove: 0.39 },
-    { maxDistance: 2400, fastBelow: 0.17, slowAbove: 0.44 },
-    { maxDistance: Infinity, fastBelow: 0.13, slowAbove: 0.63 },
+    { maxDistance: 1400, fastBelow: 0.33, slowAbove: 0.9 },
+    { maxDistance: 1800, fastBelow: 0.12, slowAbove: 0.75 },
+    { maxDistance: 2400, fastBelow: 0, slowAbove: 0.7 },
+    { maxDistance: Infinity, fastBelow: -0.03, slowAbove: 0.64 },
   ],
   /** 出遅れ（秒）。映像で分かる程度の遅れ。全出走馬のうち遅い方の約1割に当たる
    * （v2.1 でスタートのばらつきを半分にしたため 0.35 → 0.175。該当する割合は変更前 9.4%・変更後 8.4%） */
@@ -504,7 +505,7 @@ export function composeTrainerComment(rep: RaceReport, trainerName: string, vari
   else if (f.position <= 3 && f.margin <= ANALYSIS_RULES.contendMargin) say("open", VOICE.open_place);
   else {
     const m = marginLabel(f.margin);
-    parts.push({ ref: "open", text: `${m.endsWith("差") ? m : `${m}差`}の${f.position}着でした` });
+    parts.push({ ref: "open", text: `${withSa(m)}の${f.position}着でした` });
   }
   const obsIds = new Set(rep.observations.map((o) => o.id));
   const mentioned = COMMENT_OBS.filter((id) => obsIds.has(id) && VOICE[id]).slice(0, 2);
@@ -584,8 +585,13 @@ export function lapText(f: RaceFacts): string {
   return f.laps.map((l) => l.sec.toFixed(1)).join(" - ");
 }
 
+/** 「1/2馬身」→「1/2馬身差」。「大差」「同着」はそのまま（「大差差」にしない） */
+function withSa(m: string): string {
+  return m.endsWith("差") || m === "同着" ? m : `${m}差`;
+}
+
 export function resultLine(f: RaceFacts): string {
-  return `${f.position}着／${f.fieldSize}頭　${formatRaceTime(f.timeMs)}　${f.won ? `${marginLabel(f.margin)}差で勝利` : `勝ち馬から${marginLabel(f.margin)}`}`;
+  return `${f.position}着／${f.fieldSize}頭　${formatRaceTime(f.timeMs)}　${f.won ? `${withSa(marginLabel(f.margin))}で勝利` : `勝ち馬から${marginLabel(f.margin)}`}`;
 }
 
 export function tacticsLine(r: Pick<OwnerRaceRecord, "tactics">): string {
