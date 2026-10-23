@@ -505,7 +505,7 @@ export function composeTrainerComment(rep: RaceReport, trainerName: string, vari
   else if (f.position <= 3 && f.margin <= ANALYSIS_RULES.contendMargin) say("open", VOICE.open_place);
   else {
     const m = marginLabel(f.margin);
-    parts.push({ ref: "open", text: `${m.endsWith("差") ? m : `${m}差`}の${f.position}着でした` });
+    parts.push({ ref: "open", text: `${withSa(m)}の${f.position}着でした` });
   }
   const obsIds = new Set(rep.observations.map((o) => o.id));
   const mentioned = COMMENT_OBS.filter((id) => obsIds.has(id) && VOICE[id]).slice(0, 2);
@@ -585,8 +585,13 @@ export function lapText(f: RaceFacts): string {
   return f.laps.map((l) => l.sec.toFixed(1)).join(" - ");
 }
 
+/** 「1/2馬身」→「1/2馬身差」。「大差」「同着」はそのまま（「大差差」にしない） */
+function withSa(m: string): string {
+  return m.endsWith("差") || m === "同着" ? m : `${m}差`;
+}
+
 export function resultLine(f: RaceFacts): string {
-  return `${f.position}着／${f.fieldSize}頭　${formatRaceTime(f.timeMs)}　${f.won ? `${marginLabel(f.margin)}差で勝利` : `勝ち馬から${marginLabel(f.margin)}`}`;
+  return `${f.position}着／${f.fieldSize}頭　${formatRaceTime(f.timeMs)}　${f.won ? `${withSa(marginLabel(f.margin))}で勝利` : `勝ち馬から${marginLabel(f.margin)}`}`;
 }
 
 export function tacticsLine(r: Pick<OwnerRaceRecord, "tactics">): string {
