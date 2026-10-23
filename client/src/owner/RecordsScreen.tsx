@@ -14,6 +14,18 @@ import {
   allCourses,
   analyzeRace,
   bandForDistance,
+  buildRaceReport,
+  keyObservations,
+  lapText,
+  paceLabel,
+  raceFacts,
+  raceLaps,
+  tacticsLine,
+  INFO_CLASS_LABELS,
+  type InfoClass,
+  type RaceReport,
+  type ReportItem,
+  type Stance,
   courseLabel,
   formatRaceTime,
   last600Rank,
@@ -39,8 +51,17 @@ import { Pane, StanceTag, Tabs, trainerName, yen, yenSigned } from "./ui";
 type RecordsRoute = Extract<Route, { tab: "records" }>;
 
 export function RecordsScreen({ route }: { route: RecordsRoute }) {
-  const { nav } = useOwner();
-  const sub = route.sub ?? "races";
+  const { nav, ui } = useOwner();
+  const dev = ui.settings.devTools;
+  // 検証（開発・バランス調整用）は開発者向け設定をオンにしたときだけ
+  const sub = route.sub === "lab" && !dev ? "races" : route.sub ?? "races";
+  const tabs: [RecordsTab, string][] = [
+    ["races", "戦績"],
+    ["analysis", "レース分析"],
+    ["evals", "評価の推移"],
+    ["ledger", "収支・名簿"],
+    ...(dev ? ([["lab", "検証（開発用）"]] as [RecordsTab, string][]) : []),
+  ];
   return (
     <div className="screen">
       <div className="head-tabs">
@@ -48,13 +69,7 @@ export function RecordsScreen({ route }: { route: RecordsRoute }) {
         <Tabs<RecordsTab>
           label="記録・分析"
           value={sub}
-          items={[
-            ["races", "戦績"],
-            ["analysis", "レース分析"],
-            ["evals", "評価の推移"],
-            ["ledger", "収支・名簿"],
-            ["lab", "検証"],
-          ]}
+          items={tabs}
           onChange={(t) => nav.replace({ tab: "records", sub: t, raceId: route.raceId, horseId: route.horseId })}
         />
       </div>
@@ -63,7 +78,7 @@ export function RecordsScreen({ route }: { route: RecordsRoute }) {
         {sub === "analysis" && <Analysis raceId={route.raceId} />}
         {sub === "evals" && <Evals horseId={route.horseId} />}
         {sub === "ledger" && <Ledger />}
-        {sub === "lab" && <Lab />}
+        {sub === "lab" && dev && <Lab />}
       </div>
     </div>
   );
@@ -139,18 +154,42 @@ function RaceHistory({ horseId }: { horseId?: string }) {
 }
 
 /* ---------------- レース分析 ---------------- */
+// 情報を「記録・観察・推定・提案」に分け、総評 → 展開 → 走り → 詳細データ の順に見せる。
+// 表示するのはレース記録から分かることだけで、内部の速度やスタミナ残量は出さない。
 
 const COLOR_MINE = "#1E5FA8";
 const COLOR_LEAD = "#C77A1A";
+
+type AnalysisTab = "summary" | "flow" | "run" | "data";
+
+function ClassTag({ cls }: { cls: InfoClass }) {
+  return <span className={`info-class info-class-${cls}`}>{INFO_CLASS_LABELS[cls]}</span>;
+}
+
+function ItemList({ items, empty }: { items: ReportItem[]; empty?: string }) {
+  if (items.length === 0) return empty ? <p className="muted">{empty}</p> : null;
+  return (
+    <ul className="report-items">
+      {items.map((i) => (
+        <li key={i.id}>
+          <ClassTag cls={i.cls} />
+          <span>{i.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Analysis({ raceId }: { raceId?: string }) {
   const { save, nav, game, ui } = useOwner();
   const toast = useToast();
   const { busy, run } = useBusy();
   const [found, setFound] = useState<string[] | null>(null);
+  const [tab, setTab] = useState<AnalysisTab>("summary");
   const r = save.races.find((x) => x.raceId === raceId) ?? save.races.find((x) => !x.analyzed) ?? save.races[0];
-  const findings = useMemo(() => (r ? analyzeRace(r) : []), [r]);
-  if (!r) return <EmptyState icon="chart" title="分析できるレースがありません">出走すると、ラップや通過順から能力を推し量れるようになります。</EmptyState>;
+  const report = useMemo(() => (r ? buildRaceReport(r, save.races) : null), [r, save.races]);
+  if (!r || !report) return <EmptyState icon="chart" title="分析できるレースがありません">出走すると、ラップや通過順から走りを振り返れるようになります。</EmptyState>;
+  const f = report.facts;
   const before = ui.opinions[r.raceId];
   const apply = () =>
     run(() => {
@@ -186,105 +225,254 @@ function Analysis({ raceId }: { raceId?: string }) {
           </select>
         </label>
       </div>
-      <div className="cols">
-        <Pane title="何が読み取れるか">
-          <ul className="findings2">
-            {findings.map((f, i) => (
-              <li key={i}>
-                <h3>{f.title}</h3>
-                <p>{f.text}</p>
-                <p className="chips">
-                  {f.informs.map((it) => (
-                    <span key={it.key} className={`info2 info-${it.strength}`}>
-                      {KNOWLEDGE_LABELS[it.key].replace(/（.*）/, "")}：情報量{it.strength}
-                    </span>
-                  ))}
-                  {f.notInformative.map((n) => (
-                    <span key={n.key} className="info2 info-none" title={n.reason}>
-                      {KNOWLEDGE_LABELS[n.key].replace(/（.*）/, "")}：判断できない
-                    </span>
-                  ))}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {found && found.length > 0 && (
-            <div className="result-found">
-              <h3>
-                <Icon name="spark" size={16} />
-                分析で分かったこと
-              </h3>
-              <ul>
-                {found.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {r.analyzed ? (
-            <p className="hint2">
-              <Icon name="check" size={14} /> 評価に反映済みです。
-              <button className="link2" onClick={() => nav.push({ tab: "horses", horseId: r.horseId, detail: true, horseTab: "ability" })}>
-                見立てを見る
-              </button>
-            </p>
-          ) : (
-            <button className="btn btn-primary btn-block" disabled={busy} onClick={apply}>
-              分析結果を評価に反映する
-            </button>
-          )}
-        </Pane>
-        <Pane title="ラップ（200mごと）">
-          <LapChart r={r} />
-          <h3 className="settings-sub">通過順</h3>
-          <ol className="pos-flow2">
-            {r.telemetry.positions.map((p) => (
-              <li key={p.label}>
-                <span>{p.label}</span>
-                <strong>{p.pos}</strong>
-              </li>
-            ))}
-          </ol>
-          <h3 className="settings-sub">調教師の事前評価と結果</h3>
-          <div className="compare">
-            <p>
-              出走前：{before ? <StanceTag stance={before.stance} /> : <span className="muted">記録なし</span>}
-              {before?.reasons.length ? <span className="muted">（{before.reasons.slice(0, 2).join("、")}）</span> : null}
-            </p>
-            <p>
-              結果：<strong>{r.position}着</strong>／作戦 {STYLE_LABELS[r.tactics.style]}・{PACE_LABELS[r.tactics.pace]}・仕掛け{SPURT_LABELS[r.tactics.spurt]}
-            </p>
+      <Tabs<AnalysisTab>
+        label="レース分析"
+        value={tab}
+        items={[
+          ["summary", "総評"],
+          ["flow", "レース展開"],
+          ["run", "走り"],
+          ["data", "詳細データ"],
+        ]}
+        onChange={setTab}
+      />
+
+      {tab === "summary" && (
+        <div className="cols">
+          <Pane title="レース総評">
+            <dl className="facts compact">
+              <div>
+                <dt>着順</dt>
+                <dd>
+                  {f.position}着／{f.fieldSize}頭
+                </dd>
+              </div>
+              <div>
+                <dt>タイム</dt>
+                <dd>{formatRaceTime(f.timeMs)}</dd>
+              </div>
+              <div>
+                <dt>着差</dt>
+                <dd>{f.won ? `${marginLabel(f.margin)}差で勝利` : `勝ち馬から${marginLabel(f.margin)}`}</dd>
+              </div>
+              <div>
+                <dt>作戦</dt>
+                <dd>{tacticsLine(r)}</dd>
+              </div>
+            </dl>
+            <h3 className="settings-sub">主な観察</h3>
+            <ItemList items={keyObservations(report)} />
+            <h3 className="settings-sub">調教師のコメント</h3>
             <p className="trainer-voice">{r.trainerComment}</p>
-          </div>
-        </Pane>
-        <Pane title="出走馬">
-          <ol className="field-list">
-            {r.field.map((f) => (
-              <li key={f.gate} className={f.isMine ? "is-me" : ""}>
-                <span className={`mini-rank ${f.position === 1 ? "is-win" : ""}`}>{f.position}</span>
-                <SaddleCloth gate={f.gate} size="sm" />
-                <span className="mini-name">{f.name}</span>
-                <span className="mini-time">{formatRaceTime(f.timeMs)}</span>
-                <span className="mini-gap">上がり{f.last600.toFixed(1)}／{STYLE_LABELS[f.styleShown]}</span>
+          </Pane>
+          <Pane title="次走に向けて">
+            <h3 className="settings-sub">考えられること</h3>
+            <ItemList items={report.assessments} empty={f.won ? "勝ったレースです。敗因の検討はありません。" : "上位に入ったレースです。はっきりした課題は記録から読み取れませんでした。"} />
+            <h3 className="settings-sub">検討できること</h3>
+            <ItemList items={report.suggestions} />
+            <p className="hint2">推定は記録から考えられる可能性で、確かな原因ではありません。提案は試せる選択肢で、結果を保証するものではありません。</p>
+            {found && found.length > 0 && (
+              <div className="result-found">
+                <h3>
+                  <Icon name="spark" size={16} />
+                  分析で分かったこと
+                </h3>
+                <ul>
+                  {found.map((d, i) => (
+                    <li key={i}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {r.analyzed ? (
+              <p className="hint2">
+                <Icon name="check" size={14} /> 能力の見立てに反映済みです。
+                <button className="link2" onClick={() => nav.push({ tab: "horses", horseId: r.horseId, detail: true, horseTab: "ability" })}>
+                  見立てを見る
+                </button>
+              </p>
+            ) : (
+              <button className="btn btn-primary btn-block" disabled={busy} onClick={apply}>
+                このレースを能力の見立てに反映する
+              </button>
+            )}
+          </Pane>
+        </div>
+      )}
+
+      {tab === "flow" && (
+        <div className="cols">
+          <Pane title="レースの流れ">
+            <p>
+              <ClassTag cls="record" /> <strong>{paceLabel(f.pace)}</strong>
+            </p>
+            {f.firstHalfPer200 !== null && f.secondHalfPer200 !== null && (
+              <p className="muted">
+                200mあたりの平均：前半 {f.firstHalfPer200.toFixed(2)}秒／後半 {f.secondHalfPer200.toFixed(2)}秒
+              </p>
+            )}
+            <p className="hint2">同じ距離帯のレースと比べた判断です（スタート直後の200mは発馬の加速を含むので除いています）。</p>
+            <h3 className="settings-sub">レースラップ</h3>
+            <p className="lap-line">{lapText(f)}</p>
+            <p className="hint2">各区間を最初に通過した馬の時刻差です（スタートから200mごと）。</p>
+          </Pane>
+          <Pane title={`${r.horseName}の位置`}>
+            <ol className="pos-flow2">
+              {f.passing.map((p) => (
+                <li key={p.label}>
+                  <span>{p.label}</span>
+                  <strong>{p.pos}</strong>
+                </li>
+              ))}
+            </ol>
+            <ItemList items={report.observations.filter((o) => ["position_early", "late_gain", "late_loss", "move_early", "move_straight"].includes(o.id))} />
+          </Pane>
+          <Pane title="出走馬">
+            <ol className="field-list">
+              {r.field.map((x) => (
+                <li key={x.gate} className={x.isMine ? "is-me" : ""}>
+                  <span className={`mini-rank ${x.position === 1 ? "is-win" : ""}`}>{x.position}</span>
+                  <SaddleCloth gate={x.gate} size="sm" />
+                  <span className="mini-name">{x.name}</span>
+                  <span className="mini-time">{formatRaceTime(x.timeMs)}</span>
+                  <span className="mini-gap">
+                    上がり{x.last600.toFixed(1)}／序盤{STYLE_LABELS[x.styleShown]}の位置
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Pane>
+        </div>
+      )}
+
+      {tab === "run" && <RunTab r={r} report={report} before={before} />}
+
+      {tab === "data" && (
+        <div className="cols">
+          <Pane title="ラップ（200mごと）">
+            <LapChart r={r} />
+          </Pane>
+          <Pane title="記録の定義">
+            <ul className="defs">
+              <li>
+                <strong>レースラップ</strong>：各区間を最初に通過した馬の時刻差。距離が200mで割り切れないときは、最後の区間が100mです。
+                {f.lapsConsistent ? "合計は勝ち時計と一致しています。" : "合計が勝ち時計と一致しないため、参考値です。"}
               </li>
-            ))}
-          </ol>
-          <p className="hint2">
-            {trainerName(r.trainerId)}厩舎／賞金 {yen(r.prize)}
-          </p>
-        </Pane>
-      </div>
+              <li>
+                <strong>上がり3F</strong>：ゴールまでの最後の600mにかかった時間。
+              </li>
+              <li>
+                <strong>通過順</strong>：その地点を通過した順番。コーナーごとの通過順は記録していません。
+              </li>
+              <li>
+                <strong>自分の馬のラップ</strong>：自分の馬が各区間にかかった時間（ゲーム内の計測）。
+              </li>
+            </ul>
+            <p className="hint2">数値はすべてゲーム内のレース計算で計測したもので、実在の競馬の公式記録ではありません。</p>
+          </Pane>
+          <Pane title="見立ての更新に使う材料">
+            <p className="hint2">このレースを能力の見立てに反映するとき、どの項目の材料になるかの目安です。</p>
+            <ul className="findings2">
+              {analyzeRace(r).map((x, i) => (
+                <li key={i}>
+                  <h3>{x.title}</h3>
+                  <p>{x.text}</p>
+                  <p className="chips">
+                    {x.informs.map((it) => (
+                      <span key={it.key} className={`info2 info-${it.strength}`}>
+                        {KNOWLEDGE_LABELS[it.key].replace(/（.*）/, "")}：材料{it.strength === "高" ? "多い" : it.strength === "中" ? "ふつう" : "少ない"}
+                      </span>
+                    ))}
+                    {x.notInformative.map((n) => (
+                      <span key={n.key} className="info2 info-none" title={n.reason}>
+                        {KNOWLEDGE_LABELS[n.key].replace(/（.*）/, "")}：判断できない
+                      </span>
+                    ))}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Pane>
+        </div>
+      )}
     </div>
   );
 }
 
-/** 先頭と自分の馬の200mごとのラップ（1本の軸。上ほど速い） */
+/** 競走馬の走り：位置取りの推移・上がり・作戦との関係・過去のレースとの比較・出走前の意見 */
+function RunTab({ r, report, before }: { r: OwnerRaceRecord; report: RaceReport; before?: { stance: Stance; reasons: string[] } }) {
+  const { save } = useOwner();
+  const f = report.facts;
+  const past = save.races.filter((x) => x.horseId === r.horseId && x.week <= r.week).slice(0, 6);
+  const runObs = report.observations.filter((o) => ["start_slow", "style_vs_plan", "keen", "blocked", "wide", "duel_won", "duel_lost", "last3f_top", "last3f_good", "last3f_slow"].includes(o.id));
+  return (
+    <div className="cols">
+      <Pane title="この馬の走り">
+        <dl className="facts compact">
+          <div>
+            <dt>位置取り</dt>
+            <dd>{f.earlyGroup ? `序盤は${STYLE_LABELS[f.earlyGroup]}の位置（${f.earlyPos}番手）` : "記録なし"}</dd>
+          </div>
+          <div>
+            <dt>作戦</dt>
+            <dd>{tacticsLine(r)}</dd>
+          </div>
+          <div>
+            <dt>上がり3F</dt>
+            <dd>{f.last3F !== null ? `${f.last3F.toFixed(1)}秒（${f.last3FRank}位／${f.fieldSize}頭）` : "記録なし"}</dd>
+          </div>
+        </dl>
+        <ItemList items={runObs} empty="道中に目立った出来事は記録されていません。" />
+      </Pane>
+      <Pane title="過去のレースとの比較">
+        {past.length <= 1 ? (
+          <p className="muted">比べられる過去のレースがまだありません。</p>
+        ) : (
+          <ul className="compare-races">
+            {past.map((x) => {
+              const xf = raceFacts(x);
+              return (
+                <li key={x.raceId} className={x.raceId === r.raceId ? "is-me" : ""}>
+                  <span className="muted">{shortWeekLabel(x.week)}</span>
+                  <span>
+                    {x.course.trackName} {SURFACE_LABELS[x.course.surface]}
+                    {x.course.distance}m
+                  </span>
+                  <strong>
+                    {x.position}着/{x.fieldSize}
+                  </strong>
+                  <span>
+                    上がり{xf.last3F?.toFixed(1) ?? "—"}（{xf.last3FRank ?? "—"}位）
+                  </span>
+                  <span>{xf.earlyGroup ? `序盤${STYLE_LABELS[xf.earlyGroup]}` : ""}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="hint2">距離・馬場・相手が違うので、着順だけで単純に比べることはできません。</p>
+      </Pane>
+      <Pane title="調教師の見方">
+        <p>
+          出走前の意見：{before ? <StanceTag stance={before.stance} /> : <span className="muted">記録なし</span>}
+          {before?.reasons.length ? <span className="muted">（{before.reasons.slice(0, 2).join("、")}）</span> : null}
+        </p>
+        <p className="trainer-voice">{r.trainerComment}</p>
+        <p className="hint2">{trainerName(r.trainerId)}厩舎／賞金 {yen(r.prize)}</p>
+      </Pane>
+    </div>
+  );
+}
+
+/** レースラップと自分の馬のラップ（200mごと。1本の軸、上ほど速い） */
 function LapChart({ r }: { r: OwnerRaceRecord }) {
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const laps = raceLaps(r);
+  const lead = laps.map((l) => l.sec);
   const mine = r.telemetry.splits.map((t, i, a) => Math.round((t - (i ? a[i - 1] : 0)) * 100) / 100);
-  const lead = r.leaderLaps;
-  const n = Math.min(mine.length, lead.length);
+  // 200mの区間だけをグラフにする（最後が100mの区間は表で示す）
+  const n = Math.min(mine.length, laps.filter((l) => l.to - l.from === 200).length);
   if (n < 2) return <p className="muted">ラップを表示できるほどの距離がありません。</p>;
   const all = [...mine.slice(0, n), ...lead.slice(0, n)];
   const lo = Math.floor(Math.min(...all) - 0.3);
@@ -309,12 +497,12 @@ function LapChart({ r }: { r: OwnerRaceRecord }) {
     <div className="lap2">
       <div className="chart-legend">
         <span>
-          <i style={{ background: COLOR_MINE }} />
-          {r.horseName}
+          <i style={{ background: COLOR_LEAD }} />
+          レースラップ
         </span>
         <span>
-          <i style={{ background: COLOR_LEAD }} />
-          先頭
+          <i style={{ background: COLOR_MINE }} />
+          {r.horseName}（ゲーム内計測）
         </span>
         <button className="link2" onClick={() => setAsTable(!asTable)}>
           {asTable ? "グラフで見る" : "数値で見る"}
@@ -322,13 +510,13 @@ function LapChart({ r }: { r: OwnerRaceRecord }) {
       </div>
       {asTable ? (
         <ul className="lap-cards">
-          {Array.from({ length: n }, (_, i) => (
+          {laps.map((l, i) => (
             <li key={i}>
               <span>
-                {i * 200}〜{(i + 1) * 200}m
+                {l.from}〜{l.to}m
               </span>
-              <strong>{mine[i].toFixed(1)}</strong>
-              <span className="muted">先頭 {lead[i].toFixed(1)}</span>
+              <strong>{l.sec.toFixed(1)}</strong>
+              <span className="muted">自分 {mine[i] !== undefined && l.to - l.from === 200 ? mine[i].toFixed(1) : "—"}</span>
             </li>
           ))}
         </ul>
@@ -356,7 +544,7 @@ function LapChart({ r }: { r: OwnerRaceRecord }) {
             {r.horseName.length > 4 ? r.horseName.slice(0, 3) + "…" : r.horseName}
           </text>
           <text x={x(n - 1) + 6} y={yl + 4} className="axis-strong">
-            先頭
+            レース
           </text>
           {hover !== null && (
             <>
@@ -371,8 +559,8 @@ function LapChart({ r }: { r: OwnerRaceRecord }) {
       )}
       <p className="chart-tip2">
         {hover !== null && !asTable
-          ? `${hover * 200}〜${(hover + 1) * 200}m：${r.horseName} ${mine[hover].toFixed(1)}秒／先頭 ${lead[hover].toFixed(1)}秒`
-          : "縦軸は200mにかかった秒数（上ほど速い）。終盤に線が上がっていれば末脚を使えています。"}
+          ? `${hover * 200}〜${(hover + 1) * 200}m：レース ${lead[hover].toFixed(1)}秒／${r.horseName} ${mine[hover].toFixed(1)}秒`
+          : "縦軸は200mにかかった秒数（上ほど速い）。"}
       </p>
     </div>
   );

@@ -12,7 +12,8 @@ import {
   cornerRadius,
   distancesAt,
   formatRaceTime,
-  last600Rank,
+  buildRaceReport,
+  keyObservations,
   liveOrder,
   marginLabel,
   type RaceStartMsg,
@@ -237,22 +238,13 @@ function useRaceEvents(race: RaceStartMsg, t: number, dist: number[], order: num
 
 /** レース結果：着順・タイム・着差・賞金・要約・調教師の振り返り・判明したこと・次の行動 */
 function RaceResult({ running, onExit }: { running: RunningRace; onExit: (to: "analysis" | "horse" | "race" | "home") => void }) {
-  const { ui } = useOwner();
+  const { ui, save } = useOwner();
   const { outcome, discoveries } = running;
   const rec = outcome.record;
-  const tel = rec.telemetry;
   const before = ui.opinions[rec.raceId] ?? { stance: outcome.opinion.stance, reasons: outcome.opinion.reasons };
-  const early = tel.positions[0]?.pos;
-  const summary = [
-    `${STYLE_LABELS[tel.styleShown]}の位置（序盤${early}番手）から`,
-    tel.spurtRemain !== null ? `残り${tel.spurtRemain}mで仕掛け` : "",
-    `上がり3F ${tel.last600.toFixed(1)}秒（${last600Rank(rec)}位）`,
-    tel.blockedSec >= 3 ? `。直線で前が詰まる不利が${tel.blockedSec.toFixed(0)}秒あった` : "",
-    tel.emptyRemain !== null ? `。残り${tel.emptyRemain}m付近で脚が上がった` : "",
-  ]
-    .filter(Boolean)
-    .join("、")
-    .replace(/、。/g, "。");
+  // 結果の要約は、記録から確かめられる観察だけで作る（内部の数値は使わない）
+  const report = buildRaceReport(rec, save.races);
+  const summary = keyObservations(report, 2).map((o) => o.text).join("。");
   const win = rec.position === 1;
   return (
     <div className="result-overlay" role="dialog" aria-label="レース結果">
@@ -283,7 +275,7 @@ function RaceResult({ running, onExit }: { running: RunningRace; onExit: (to: "a
               </dd>
             </div>
           </dl>
-          <p className="result-summary">{summary}。</p>
+          {summary && <p className="result-summary">{summary}。</p>}
           <p className="trainer-voice">{rec.trainerComment}</p>
           <p className="result-before">
             出走前の意見 <StanceTag stance={before.stance} />（{trainerName(rec.trainerId)}調教師）

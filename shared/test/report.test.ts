@@ -102,7 +102,11 @@ test("コメントで触れた出来事は、すべて記録で確かめられ�
       if (p.ref === "open") {
         if (rec.position === 1) assert.match(p.text, /頑張|勝ち切/);
         else assert.doesNotMatch(p.text, /勝ち切|頑張ってくれ/);
+        // 「上位争い」と言うのは、2・3着で勝ち馬との差が小さいときだけ
+        if (/上位/.test(p.text)) assert.ok(rec.position <= 3 && Math.abs(rec.marginToWinner) <= R.contendMargin, `${rec.raceId}: ${p.text}（${rec.position}着・${rec.marginToWinner}馬身）`);
       }
+      // 記録に問題がないのに「スムーズに運べたら」のような前提を置かない
+      if (p.ref === "s_retry") assert.ok(rep.assessments.some((a) => a.id === "a_blocked" || a.id === "a_wide"), `${rec.raceId}: ${p.text}`);
     }
   }
 });
@@ -196,7 +200,7 @@ test("負けて目立った出来事がない記録では、原因を特定で�
   const plain = withTelemetry(
     r,
     { blockedSec: 0, keenSec: 0, extraMeters: 0, startDelay: 0, duel: { occurred: false, gained: false }, positions: [
-      { label: "序盤", remain: 1000, pos: 4 },
+      { label: "序盤", remain: r.course.distance - 400, pos: 4 },
       { label: "残り400m", remain: 400, pos: 5 },
       { label: "ゴール", remain: 0, pos: 5 },
     ] },
@@ -360,4 +364,30 @@ test("週報の観察は「印象」として述べ、事実として断定し�
     }
   }
   assert.ok(seen > 10);
+});
+
+test("通過順は通過した順に並び、序盤の位置は400m地点の通過順になる", () => {
+  for (const { rec } of races()) {
+    const f = raceFacts(rec);
+    for (let i = 1; i < f.passing.length; i++) assert.ok(f.passing[i - 1].remain > f.passing[i].remain, `${rec.course.distance}m の通過順の並び`);
+    const at400 = rec.telemetry.positions.find((p) => p.remain === rec.course.distance - 400);
+    assert.equal(f.earlyPos, at400?.pos ?? null);
+    if (f.passing.length) assert.equal(f.passing[f.passing.length - 1].pos, rec.position);
+  }
+});
+
+test("ペースは同じ距離帯のレースと比べて判断し、どの距離帯でも速い・平均的・ゆったりが出る", () => {
+  const seen: Record<string, Set<string>> = {};
+  for (const w of [60, 70, 80, 90, 100, 110, 120, 130, 140, 150]) {
+    for (const p of raceCard(w)) {
+      const cpus = generateCpuEntries(p, 8, w * 31 + p.course.distance);
+      const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 7 + 3);
+      const field = sim.results.map((r) => ({ gate: r.gate, name: r.id, isMine: r.position === 1, position: r.position, timeMs: r.timeMs, marginLengths: r.marginLengths, last600: sim.telemetry[r.id].last600, styleShown: sim.telemetry[r.id].styleShown }));
+      const rec = { ...oneRace(), course: p.course, leaderLaps: sim.leaderLaps, field, position: 1, telemetry: sim.telemetry[sim.results[0].id] } as OwnerRaceRecord;
+      const pace = raceFacts(rec).pace;
+      const band = p.course.distance <= 1400 ? "短" : p.course.distance <= 1800 ? "マ" : p.course.distance <= 2400 ? "中" : "長";
+      (seen[band] ??= new Set()).add(String(pace));
+    }
+  }
+  for (const b of ["短", "マ", "中"]) assert.ok(seen[b] && seen[b].size >= 2, `${b}: ${[...(seen[b] ?? [])]}`);
 });

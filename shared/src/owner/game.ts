@@ -794,3 +794,35 @@ export function isNewYearWeek(week: number): boolean {
   return week % WEEKS_PER_YEAR === 0;
 }
 
+
+/* ---------------- 旧バージョンのコメントの作り直し ---------------- */
+
+/**
+ * 保存されているレース後の調教師コメントを、レース記録から作り直す（セーブの形式は変えない）。
+ * 以前のバージョンは内部の数値から「脚が上がった」などと断定していたため、読み込み時に置き換える。
+ * 馬の記録（ログ）に残っている同じ文も置き換える。何度実行しても結果は同じ。
+ */
+export function refreshRaceComments(s: OwnerSave): OwnerSave {
+  const replaced = new Map<string, string>(); // `${horseId}|${week}|${旧コメント}` → 新コメント
+  let changed = false;
+  const races = s.races.map((r) => {
+    const name = findTrainer(r.trainerId)?.name ?? "担当";
+    const text = trainerRaceReview(r, name, s.races.filter((x) => x.horseId === r.horseId));
+    if (text === r.trainerComment) return r;
+    changed = true;
+    replaced.set(`${r.horseId}|${r.week}|${r.trainerComment}`, text);
+    return { ...r, trainerComment: text };
+  });
+  if (!changed) return s;
+  const horses = s.horses.map((h) => {
+    let touched = false;
+    const log = h.log.map((e) => {
+      const next = e.kind === "report" ? replaced.get(`${h.id}|${e.week}|${e.text}`) : undefined;
+      if (next === undefined) return e;
+      touched = true;
+      return { ...e, text: next };
+    });
+    return touched ? { ...h, log } : h;
+  });
+  return { ...s, races, horses };
+}

@@ -3059,3 +3059,85 @@ button.offer2 {
   .status-save:not(.is-error) { display: none; }
   .status-money { font-size: 0.98rem; }
 }
+
+/* ---------- レース分析：記録・観察・推定・提案 ---------- */
+/* 種類は色だけでなく文字（記録／観察／推定／提案）でも示す。推定は点線で「確定ではない」ことを表す */
+.info-class {
+  display: inline-block;
+  flex: none;
+  min-width: 2.6em;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--c-line);
+  color: var(--c-sub);
+  background: var(--c-panel);
+}
+.info-class-observation {
+  border-color: #1e5fa8;
+  color: #1e5fa8;
+}
+.info-class-assessment {
+  border-color: var(--c-warn);
+  border-style: dashed;
+  color: var(--c-warn);
+}
+.info-class-suggestion {
+  border-color: var(--c-ok);
+  color: var(--c-ok);
+}
+.report-items {
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.report-items li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.lap-line {
+  margin: 0.2rem 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.defs {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.compare-races {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.compare-races li {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.2rem 0.6rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.compare-races li > :last-child {
+  grid-column: 2 / -1;
+  color: var(--c-sub);
+}
+.compare-races li.is-me {
+  background: #fff6dc;
+}

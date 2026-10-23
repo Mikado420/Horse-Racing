@@ -22,13 +22,22 @@ import { PACE_LABELS, SPURT_LABELS } from "./sim";
 
 /**
  * レース分析の判定基準。
- * ペースの基準は、このゲームのレース486回（3年分の番組・CPU馬8頭立て）を計算して決めた。
- * 「前半の200mあたり平均 − 後半の200mあたり平均」の分布は 10%点 0.26秒・中央値 0.88秒・90%点 1.46秒
- * （このゲームでは前半がゆったりした後傾ラップが普通）。下位およそ15%を「速い流れ」、上位およそ15%を「ゆったりした流れ」とする。
+ *
+ * ペース：「前半の200mあたり平均 − 後半の200mあたり平均」（スタート直後の200mは発馬の加速を含むので除く）を、
+ * 同じ距離帯のレースと比べて判断する。基準は、このゲームのレース1,292回（4年分の番組・CPU馬8頭立て）を計算して決めた。
+ * 距離帯ごとに下位15%を「前半が速い流れ」、上位15%を「前半がゆったりした流れ」とする。
+ *   短距離（〜1400m）  15%点 0.30秒・中央値 0.54秒・85%点 0.74秒（n=487）
+ *   マイル（〜1800m）  15%点 0.13秒・中央値 0.30秒・85%点 0.50秒（n=346）
+ *   中距離（〜2400m）  15%点 -0.08秒・中央値 0.18秒・85%点 0.40秒（n=325）
+ *   長距離（2500m〜）  15%点 -0.22秒・中央値 -0.10秒・85%点 0.00秒（n=134）
  */
 export const ANALYSIS_RULES = {
-  paceFastBelow: 0.45,
-  paceSlowAbove: 1.35,
+  pace: [
+    { maxDistance: 1400, fastBelow: 0.3, slowAbove: 0.74 },
+    { maxDistance: 1800, fastBelow: 0.13, slowAbove: 0.5 },
+    { maxDistance: 2400, fastBelow: -0.08, slowAbove: 0.4 },
+    { maxDistance: Infinity, fastBelow: -0.22, slowAbove: 0.0 },
+  ],
   /** 出遅れ（秒）。映像で分かる程度の遅れ */
   slowStartSec: 0.35,
   /** 前が壁になった（秒の合計）。一瞬ではなく、はっきり分かる程度 */
@@ -41,6 +50,8 @@ export const ANALYSIS_RULES = {
   lateMove: 2,
   /** 着差（馬身）がこれ以下なら「惜しい」 */
   closeMargin: 1.0,
+  /** 2・3着で、勝ち馬との差がこれ以下なら「上位争いができた」と言える */
+  contendMargin: 2.0,
   /** 過去の成績と比べるときの、着順の割合（着順÷頭数）の差 */
   betterFinish: 0.25,
   maxObservations: 3,
@@ -83,14 +94,14 @@ export interface RaceFacts {
   laps: LapSegment[];
   /** ラップの合計が勝ち時計と許容誤差内で一致するか */
   lapsConsistent: boolean;
-  /** 前半・後半の200mあたりの平均（秒） */
+  /** 前半・後半の200mあたりの平均（秒。スタート直後の200mを除く） */
   firstHalfPer200: number | null;
   secondHalfPer200: number | null;
   pace: "fast" | "even" | "slow" | null;
   /** 上がり3F（最後の600mにかかった時間）と、出走馬の中での順位（速い順） */
   last3F: number | null;
   last3FRank: number | null;
-  /** 地点ごとの通過順 */
+  /** 地点ごとの通過順（通過した順に並べる） */
   passing: { label: string; remain: number; pos: number }[];
   earlyPos: number | null;
   /** 序盤の位置から見た実際の位置取り */
@@ -135,9 +146,11 @@ export function raceLaps(r: Pick<OwnerRaceRecord, "leaderLaps" | "course" | "fie
   return laps;
 }
 
+/** 前半・後半の200mあたりの平均（スタート直後の200mは発馬の加速を含むので除く） */
 function halves(laps: LapSegment[], D: number): { first: number | null; second: number | null } {
   let t1 = 0, d1 = 0, t2 = 0, d2 = 0;
   for (const l of laps) {
+    if (l.from === 0) continue;
     const len = l.to - l.from;
     if (l.to <= D / 2) {
       t1 += l.sec;
@@ -150,6 +163,13 @@ function halves(laps: LapSegment[], D: number): { first: number | null; second: 
   return { first: d1 ? (t1 / d1) * 200 : null, second: d2 ? (t2 / d2) * 200 : null };
 }
 
+/** 同じ距離帯のレースと比べたペースの判断 */
+export function paceOf(diff: number | null, D: number): RaceFacts["pace"] {
+  if (diff === null) return null;
+  const b = ANALYSIS_RULES.pace.find((x) => D <= x.maxDistance)!;
+  return diff <= b.fastBelow ? "fast" : diff >= b.slowAbove ? "slow" : "even";
+}
+
 export function raceFacts(r: OwnerRaceRecord): RaceFacts {
   const t = r.telemetry;
   const D = r.course.distance;
@@ -158,12 +178,17 @@ export function raceFacts(r: OwnerRaceRecord): RaceFacts {
   const sum = laps.reduce((a, l) => a + l.sec, 0);
   const { first, second } = halves(laps, D);
   const diff = first !== null && second !== null ? first - second : null;
-  const pace = diff === null ? null : diff <= ANALYSIS_RULES.paceFastBelow ? "fast" : diff >= ANALYSIS_RULES.paceSlowAbove ? "slow" : "even";
+  const pace = paceOf(diff, D);
   const mine = r.field.find((f) => f.isMine);
   const last3F = mine ? mine.last600 : t.last600 || null;
   const last3FRank = last3F ? [...r.field].sort((a, b) => a.last600 - b.last600).findIndex((f) => f.isMine) + 1 || null : null;
-  const passing = t.positions.map((p) => ({ label: p.label, remain: p.remain, pos: p.pos }));
+  // 通過した順（残り距離の大きい順）に並べる。短い距離では「残り800m」が「序盤（400m地点）」より先に来る
+  const passing = t.positions
+    .map((p) => ({ label: p.remain === D - 400 ? "序盤（400m地点）" : p.label, remain: p.remain, pos: p.pos }))
+    .sort((a, b) => b.remain - a.remain);
   const posAt400 = passing.find((p) => p.remain === 400)?.pos ?? null;
+  // 序盤の位置は、実際の位置取り（styleShown）と同じ「スタートから400m地点」の通過順
+  const early = passing.find((p) => p.remain === D - 400) ?? null;
   return {
     raceId: r.raceId,
     position: r.position,
@@ -181,8 +206,8 @@ export function raceFacts(r: OwnerRaceRecord): RaceFacts {
     last3F: last3F ?? null,
     last3FRank,
     passing,
-    earlyPos: passing[0]?.pos ?? null,
-    earlyGroup: passing.length ? t.styleShown : null,
+    earlyPos: early?.pos ?? null,
+    earlyGroup: early ? t.styleShown : null,
     posAt400,
     lateChange: posAt400 === null ? null : posAt400 - r.position,
   };
@@ -271,6 +296,10 @@ const SUGGESTIONS: Record<string, { text: string; voice: string[] }> = {
   s_longer: {
     text: "距離を延ばして、適性を確かめる",
     voice: ["次は距離を延ばして、適性を確かめたいですね", "一度距離を延ばして、走りを比べてみたいですね"],
+  },
+  s_confirm: {
+    text: "似た条件でもう一度走らせ、今回の走りが続くか確かめる",
+    voice: ["似た条件でもう一度使って、今回の走りが続くか見てみたいですね", "同じような条件でもう一度使って、今回の内容を確かめたいですね"],
   },
   s_other: {
     text: "距離や作戦を一つずつ変えて、もう一度走りを確かめる",
@@ -403,7 +432,7 @@ export function buildRaceReport(r: OwnerRaceRecord, history: readonly OwnerRaceR
     suggestionIds.push("s_other");
   }
   if (f.won) suggestionIds.push("s_keep");
-  else if (!lostBadly && suggestionIds.length === 0) suggestionIds.push("s_retry");
+  else if (!lostBadly && suggestionIds.length === 0) suggestionIds.push("s_confirm");
 
   const suggestions: ReportItem[] = suggestionIds.slice(0, ANALYSIS_RULES.maxSuggestions).map((id) => ({
     id,
@@ -470,7 +499,7 @@ export function composeTrainerComment(rep: RaceReport, trainerName: string, vari
   const say = (ref: string, list: readonly string[]) => parts.push({ ref, text: variant(list, `${variantSeed}|${ref}`) });
 
   if (f.won) say("open", VOICE.open_win);
-  else if (f.position <= 3) say("open", VOICE.open_place);
+  else if (f.position <= 3 && f.margin <= ANALYSIS_RULES.contendMargin) say("open", VOICE.open_place);
   else {
     const m = marginLabel(f.margin);
     parts.push({ ref: "open", text: `${m.endsWith("差") ? m : `${m}差`}の${f.position}着でした` });
