@@ -4,6 +4,7 @@ import {
   ABILITY_KEYS,
   CONDITION_LABELS,
   findTrainer,
+  marginLabel,
   shortWeekLabel,
   type DisplayStage,
   type HorseState,
@@ -298,4 +299,10 @@ export function Tabs<T extends string>({ value, items, onChange, label }: { valu
       ))}
     </div>
   );
+}
+
+/** 着差に「差」を付けた表記（「大差」「同着」はそのまま） */
+export function marginSa(lengths: number): string {
+  const l = marginLabel(lengths);
+  return l === "大差" || l === "同着" ? l : `${l}差`;
 }

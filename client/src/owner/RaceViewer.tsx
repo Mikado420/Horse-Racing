@@ -25,7 +25,7 @@ import { RaceScene, type CameraMode } from "../three/RaceScene";
 import { useOwner } from "./context";
 import { Icon } from "./icons";
 import type { RunningRace } from "./OwnerApp";
-import { StanceTag, trainerName, yen } from "./ui";
+import { StanceTag, marginSa, trainerName, yen } from "./ui";
 import { useUpdateBlocker } from "../pwa/hooks";
 
 const COUNTDOWN_MS = 3200;
@@ -266,7 +266,7 @@ function RaceResult({ running, onExit }: { running: RunningRace; onExit: (to: "a
             </div>
             <div>
               <dt>着差</dt>
-              <dd>{win ? `${marginLabel(Math.abs(rec.marginToWinner))}差で勝利` : `勝ち馬から${marginLabel(rec.marginToWinner)}`}</dd>
+              <dd>{win ? `${marginSa(Math.abs(rec.marginToWinner))}で勝利` : `勝ち馬から${marginLabel(rec.marginToWinner)}`}</dd>
             </div>
             <div>
               <dt>賞金</dt>

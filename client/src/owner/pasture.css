@@ -81,20 +81,7 @@
 /* =========================================================
    ホーム「牧場」
    ========================================================= */
-.home3 {
-  position: relative;
-  /* 重ね順をこの画面の中だけに閉じ込める（シートや確認ダイアログより前に出ないように） */
-  isolation: isolate;
-  padding: 0;
-  gap: 0;
-  overflow: hidden;
-  --todo-w: clamp(240px, 36%, 330px);
-}
-.home-scene {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
+
 .pasture-scene {
   position: absolute;
   inset: 0;
@@ -102,129 +89,9 @@
   height: 100%;
   display: block;
 }
-.home-meta {
-  position: absolute;
-  z-index: 120;
-  top: 10px;
-  left: 12px;
-  margin: 0;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.home-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(13, 31, 24, 0.55);
-  color: var(--ink-on-dark);
-  font-size: 0.76rem;
-  backdrop-filter: blur(4px);
-}
-.home-meta strong {
-  font-weight: 700;
-}
 
 /* 牧場の馬 */
-.paddock {
-  position: absolute;
-  inset: 0 calc(var(--todo-w) + 24px) 0 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.paddock-spot {
-  position: absolute;
-  left: calc(9% + var(--x) * 80%);
-  top: var(--y);
-  transform: translate(-50%, -96%);
-  width: calc(var(--s) * clamp(112px, 38vh, 196px));
-}
-.paddock-horse {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  color: inherit;
-}
-.paddock-horse .horse-fig {
-  width: 100%;
-  height: auto;
-  display: block;
-  transition: transform 0.2s ease;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.05));
-}
-.paddock-horse:hover .horse-fig,
-.paddock-horse:focus-visible .horse-fig {
-  transform: translateY(-3px);
-}
-.paddock-tag {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  max-width: 240%;
-  margin-bottom: 4px;
-  padding: 2px 11px;
-  border-radius: 999px;
-  background: rgba(24, 60, 48, 0.88);
-  border: 1px solid rgba(199, 164, 91, 0.7);
-  color: #fff;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-}
-.paddock-tag::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  width: 1.5px;
-  height: 6px;
-  background: rgba(24, 60, 48, 0.7);
-}
-.paddock-tag.tag-urgent {
-  border-color: #ffb3a8;
-  background: rgba(130, 34, 30, 0.9);
-}
-.paddock-tag.tag-check {
-  border-color: #f0cd62;
-}
-.paddock-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.paddock-rep {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  padding: 0 5px 0 3px;
-  border-radius: 999px;
-  background: var(--c-gold);
-  color: var(--c-brand);
-  font-family: var(--font-body);
-  font-size: 0.68rem;
-  line-height: 1.5;
-}
-.paddock-more {
-  position: absolute;
-  right: 8px;
-  top: 56%;
-}
-.paddock-more .link2 {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--glass);
-}
+
 .home-empty {
   position: absolute;
   left: 30%;
@@ -365,49 +232,7 @@
 }
 
 /* 今週の判断（右の列） */
-.home-todo {
-  position: absolute;
-  z-index: 140;
-  top: 10px;
-  right: 12px;
-  bottom: 104px;
-  width: var(--todo-w);
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  background: var(--glass);
-  border: 1px solid var(--glass-line);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(8px);
-  overflow: hidden;
-}
-.home-todo-head {
-  flex: none;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 8px 14px 6px;
-  background: var(--c-brand);
-  color: var(--ink-on-dark);
-}
-.home-todo-head h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 0.98rem;
-  letter-spacing: 0.08em;
-}
-.home-todo-head span {
-  font-size: 0.78rem;
-  color: var(--c-gold);
-  font-weight: 700;
-}
-.home-todo-body {
-  flex: 1;
-  padding: 8px;
-}
-.home-todo-body .empty {
-  padding: 12px 6px;
-}
+
 .todo-cards {
   list-style: none;
   margin: 0;
@@ -480,84 +305,6 @@
 }
 
 /* 次の週へ */
-.home-next {
-  position: absolute;
-  z-index: 150;
-  right: 12px;
-  bottom: 10px;
-  width: var(--todo-w);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.btn-next {
-  position: relative;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  width: 86px;
-  height: 86px;
-  border-radius: 50%;
-  border: 3px solid var(--c-gold);
-  background: radial-gradient(circle at 35% 30%, #3f8a64 0%, var(--c-action) 45%, #1f4d38 100%);
-  color: #fff;
-  box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.55),
-    0 10px 24px rgba(13, 31, 24, 0.35);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.btn-next:hover {
-  transform: translateY(-1px);
-}
-.btn-next:active {
-  transform: scale(0.97);
-}
-.btn-next:disabled {
-  filter: grayscale(0.6);
-  opacity: 0.7;
-  cursor: default;
-}
-.btn-next-label {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-}
-.btn-next .spinner {
-  width: 24px;
-  height: 24px;
-}
-.btn-next4 {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 64px;
-  height: 56px;
-  padding: 0 12px;
-  border-radius: 14px;
-  border: 1px solid var(--glass-line);
-  background: var(--glass);
-  color: var(--c-brand);
-  font-weight: 800;
-  font-size: 0.95rem;
-  line-height: 1.1;
-  box-shadow: var(--glass-shadow);
-  cursor: pointer;
-}
-.btn-next4 small {
-  font-size: 0.66rem;
-  font-weight: 700;
-  color: var(--c-sub);
-}
-.btn-next4:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
 
 /* ---------- 縦向き・狭い画面のホーム ---------- */
 @media (max-width: 699px), (orientation: portrait) and (max-width: 900px) {
@@ -576,28 +323,11 @@
   .status-save {
     margin-left: 0;
   }
-  .home3 {
-    display: flex;
-    flex-direction: column;
-  }
-  .home-scene {
-    position: relative;
-    flex: 0 0 auto;
-    height: min(46%, 320px);
-    min-height: 220px;
-  }
-  .paddock {
-    inset: 12% 0 58px 0;
-  }
-  .paddock-spot {
-    top: var(--yp);
-    left: calc(13% + var(--x) * 74%);
-    width: calc(var(--s) * clamp(96px, 29vw, 160px));
-  }
-  .paddock-tag {
-    font-size: 0.74rem;
-    padding: 1px 9px;
-  }
+  
+  
+  
+  
+  
   .voice {
     left: 8px;
     right: 8px;
@@ -607,42 +337,11 @@
   .voice-text {
     -webkit-line-clamp: 1;
   }
-  .home-todo {
-    position: relative;
-    inset: auto;
-    flex: 1;
-    width: auto;
-    min-height: 0;
-    margin: 10px 12px 0;
-    background: var(--c-panel);
-    box-shadow: none;
-    border-color: var(--c-line);
-  }
-  .home-next {
-    position: relative;
-    inset: auto;
-    width: auto;
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom) * 0);
-  }
-  .btn-next {
-    flex: 1;
-    flex-direction: row;
-    gap: 0.4rem;
-    width: auto;
-    height: 52px;
-    border-radius: 12px;
-    border-width: 2px;
-    box-shadow: 0 4px 12px rgba(13, 31, 24, 0.2);
-  }
-  .btn-next-label {
-    font-size: 1rem;
-  }
-  .btn-next4 {
-    height: 52px;
-    box-shadow: none;
-    border-color: var(--c-line);
-    background: var(--c-panel);
-  }
+  
+  
+  
+  
+  
 }
 @media (max-width: 380px) {
   .status-week {
@@ -653,17 +352,6 @@
   .status-money {
     background: none;
     padding: 0;
-  }
-}
-
-/* 低い横画面（スマートフォン横向き）では、右の列と下のボタンを少し詰める */
-@media (max-height: 420px) and (orientation: landscape) {
-  .home-todo {
-    bottom: 96px;
-  }
-  .btn-next {
-    width: 78px;
-    height: 78px;
   }
 }
 
