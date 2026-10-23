@@ -36,7 +36,7 @@ import {
   trainerName,
   yen,
 } from "./ui";
-import { currentClassLabel, economyOf, type HorseCardVM, type ReportVM } from "./vm";
+import { currentClassLabel, economyOf, horseRow, type HorseCardVM, type ReportVM } from "./vm";
 import { COAT_LABELS, HorseFigure, coatOf } from "./art";
 
 type HorsesRoute = Extract<Route, { tab: "horses" }>;
@@ -68,7 +68,8 @@ function HorseList({ selectedId }: { selectedId?: string }) {
         </EmptyState>
       ) : (
         <div className="scroll horse-scroll">
-          <ul className="horse-grid3">
+          <HorseTable selectedId={selectedId} onOpen={open} />
+          <ul className="horse-grid3 only-narrow">
             {vm.horses.map((h) => (
               <li key={h.view.id}>
                 <HorseSummaryCard h={h} selected={h.view.id === selectedId} onOpen={() => open(h.view.id)} />
@@ -81,12 +82,76 @@ function HorseList({ selectedId }: { selectedId?: string }) {
   );
 }
 
+/** 競馬新聞の馬柱のような一覧（広い画面用）。行を選ぶと詳細へ */
+function HorseTable({ selectedId, onOpen }: { selectedId?: string; onOpen: (id: string) => void }) {
+  const { vm, save } = useOwner();
+  return (
+    <table className="horse-table only-wide">
+      <caption className="sr-only">愛馬の一覧</caption>
+      <thead>
+        <tr>
+          <th scope="col">馬名</th>
+          <th scope="col">性齢・厩舎</th>
+          <th scope="col">状態</th>
+          <th scope="col">脚質（見立て）</th>
+          <th scope="col">主な適性（見立て）</th>
+          <th scope="col">近走</th>
+          <th scope="col">次の予定</th>
+        </tr>
+      </thead>
+      <tbody>
+        {vm.horses.map((h) => {
+          const row = horseRow(save, h.view);
+          return (
+            <tr key={h.view.id} className={h.view.id === selectedId ? "is-selected" : ""} onClick={() => onOpen(h.view.id)}>
+              <th scope="row">
+                <button className="ht-name" onClick={(e) => (e.stopPropagation(), onOpen(h.view.id))}>
+                  <span className="ht-fig" aria-hidden>
+                    <HorseFigure horseId={h.view.id} pose="stand" />
+                  </span>
+                  <span>
+                    <strong>{h.view.name}</strong>
+                    {h.unreadReports > 0 && <small className="ht-rep">報告 {h.unreadReports}件</small>}
+                  </span>
+                </button>
+              </th>
+              <td>
+                {h.view.age}歳
+                <small>{h.trainerName}厩舎</small>
+              </td>
+              <td>
+                <HorseConditionBadge c={h.condition} />
+              </td>
+              <td>{row.style ?? <span className="muted">まだ分からない</span>}</td>
+              <td>{row.apt.length ? row.apt.join("・") : <span className="muted">まだ分からない</span>}</td>
+              <td>
+                {row.form.length ? (
+                  <span className="hl-form">
+                    {row.form.map((p, i) => (
+                      <span key={i} className={`form-pos ${p === 1 ? "is-win" : p <= 3 ? "is-place" : ""}`}>
+                        {p}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="muted">未出走</span>
+                )}
+              </td>
+              <td>{h.nextPlan}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 const TABS: [HorseTab, string][] = [
-  ["overview", "概要"],
-  ["care", "育成・状態"],
+  ["overview", "基本情報"],
   ["ability", "能力・適性"],
-  ["reports", "厩舎報告"],
+  ["care", "状態・調教"],
   ["races", "戦績・分析"],
+  ["reports", "調教師の報告"],
   ["owner", "所有・経営"],
 ];
 

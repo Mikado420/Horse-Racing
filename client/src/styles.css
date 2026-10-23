@@ -1236,3 +1236,23 @@ select,
 textarea {
   font-size: max(16px, 1em) !important;
 }
+
+/* 画面には出さず、読み上げにだけ使う見出し */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* 数字の桁をそろえる（タイム・賞金・着順） */
+.num,
+.mini-time,
+.status-money,
+.form-pos {
+  font-variant-numeric: tabular-nums;
+}

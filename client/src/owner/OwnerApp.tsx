@@ -1,6 +1,7 @@
 // オフライン版（馬主モード）の画面全体：画面遷移・共通の通知と確認・レース観戦への切り替え
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OwnerRaceOutcome, Tactics } from "@owners/shared";
+import "./v4.css";
 import { NewGameScreen } from "../offline/NewGameScreen";
 import type { OwnerGame } from "../offline/useOwnerGame";
 import { AppShell } from "./AppShell";
