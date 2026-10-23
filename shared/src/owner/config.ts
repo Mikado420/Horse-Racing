@@ -57,6 +57,41 @@ export interface GameConfig {
   race: {
     hz: number;
     sampleDt: number;
+    /** 最高速度 = (topBase + topPerSpeed × スピード) × 各種補正（m/秒） */
+    topBase: number;
+    topPerSpeed: number;
+    /** 状態の補正：調子1段階あたり・疲労1あたり・仕上がり（0〜100）の重み */
+    conditionPerLevel: number;
+    fatiguePerPoint: number;
+    fitnessWeight: number;
+    /** 芝・ダート適性が最も低いときの速度の低下率 */
+    surfaceFit: number;
+    /** その日の出来（レースごとの体調のゆらぎ）の標準偏差 */
+    formSd: number;
+    /** エネルギーが尽きたときに保てる速度（最高速度に対する割合） */
+    emptyFloor: number;
+    /** エネルギーの残りがこの割合を切ると、そこから徐々に速度が落ち始める（0 なら尽きた瞬間に落ちる） */
+    fadeReserve: number;
+    /** 馬群について行く：前の馬がこの距離（m）以内にいれば、その馬の速度に合わせようとする */
+    followRange: number;
+    /** ついて行くときに出してよい速度の上限（最高速度に対する割合。0 ならついて行かない） */
+    followMaxFraction: number;
+    /** 配分：残りのエネルギーで最後まで持つ速度にこの係数をかけた速度を、道中の上限にする（0 なら配分しない） */
+    staminaPacing: number;
+    /** 有酸素で賄える消費（1秒あたり）。これを超えた分だけエネルギーが減る（0 なら速度の2乗にそのまま比例） */
+    aerobicRate: number;
+    /** エネルギー量（無酸素で使える余力）の倍率 */
+    energyScale: number;
+    /** 競り合いの効果を、並んでいる度合いに応じて弱める度合い（0 なら1.6m以内で一律に効く） */
+    duelTaper: number;
+    /** 馬ごとの速度差（能力・芝ダート/回り/小回り/脚質の適性・状態・その日の出来）を縮める倍率（1 ならそのまま） */
+    differenceScale: number;
+    /** ついて行くときに、残りのエネルギーで走り切れる速度の何倍まで無理をするか（配分が有効なときだけ） */
+    followOverPace: number;
+    /** 道中のペースを 1600m を基準に 1000m あたり何割ゆるめるか（短い距離では逆に速める。0 なら距離によらない） */
+    cruisePerKm: number;
+    /** スタートのばらつき（出遅れ）の大きさの倍率 */
+    startDelayScale: number;
   };
 }
 
@@ -105,7 +140,43 @@ export const DEFAULT_CONFIG: GameConfig = {
   race: {
     hz: 10,
     sampleDt: 0.25,
+    topBase: 16.6,
+    topPerSpeed: 0.034,
+    conditionPerLevel: 0.012,
+    fatiguePerPoint: 0.0008,
+    fitnessWeight: 0.05,
+    surfaceFit: 0.06,
+    formSd: 0.009,
+    emptyFloor: 0.89,
+    fadeReserve: 0.1,
+    followRange: 20,
+    followMaxFraction: 0.97,
+    staminaPacing: 1,
+    aerobicRate: 7.9,
+    energyScale: 0.565,
+    duelTaper: 1,
+    differenceScale: 0.5,
+    followOverPace: 1.02,
+    cruisePerKm: 0.05,
+    startDelayScale: 0.5,
   },
+};
+
+/**
+ * 着差の調整（docs/margins）より前、v2.0 のレース計算と同じ動きになる race 設定の差分。
+ * withConfig({ race: LEGACY_RACE_V20 }) で、同じシードから変更前の結果をそのまま再現できる（比較・検証用）
+ */
+export const LEGACY_RACE_V20: Partial<GameConfig["race"]> = {
+  fadeReserve: 0,
+  followRange: 0,
+  followMaxFraction: 0,
+  staminaPacing: 0,
+  aerobicRate: 0,
+  energyScale: 1,
+  duelTaper: 0,
+  differenceScale: 1,
+  cruisePerKm: 0,
+  startDelayScale: 1,
 };
 
 /** 一部だけ差し替えた設定を作る（テストや調整用） */
