@@ -40,7 +40,7 @@ test("報告の重要度と未確認の判定", () => {
   assert.equal(injured.kind, "injury");
 });
 
-test("重要事項は緊急 → 要確認 → 通常の順に並ぶ", () => {
+test("重要事項は要対応 → 確認 → お知らせの順に並ぶ", () => {
   const s = played();
   const tired = { ...s, horses: s.horses.map((h) => ({ ...h, state: { ...h.state, fatigue: 75 } })) };
   const list = todos(tired, buildVM(tired, new Set()));

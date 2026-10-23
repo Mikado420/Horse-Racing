@@ -1,5 +1,5 @@
 // オフライン版（馬主モード）の画面全体：画面遷移・共通の通知と確認・レース観戦への切り替え
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OwnerRaceOutcome, Tactics } from "@owners/shared";
 import { NewGameScreen } from "../offline/NewGameScreen";
 import type { OwnerGame } from "../offline/useOwnerGame";
@@ -35,11 +35,37 @@ export interface RunningRace {
   discoveries: string[];
 }
 
-/** 画面遷移。戻る操作（画面内の戻る・端末の戻る）で前の画面と選択状態に戻る */
+/** 画面本体の中でスクロールしている場所（本体と、タブの中身などのスクロール領域）の位置を控える */
+function captureScroll(): number[] {
+  const main = document.getElementById("main");
+  if (!main) return [];
+  return [main, ...Array.from(main.querySelectorAll<HTMLElement>(".scroll, .screen"))].map((el) => el.scrollTop);
+}
+function restoreScroll(pos: number[]) {
+  const main = document.getElementById("main");
+  if (!main || !pos.length) return;
+  [main, ...Array.from(main.querySelectorAll<HTMLElement>(".scroll, .screen"))].forEach((el, i) => {
+    if (pos[i] !== undefined) el.scrollTop = pos[i];
+  });
+}
+
+/**
+ * 画面遷移。戻る操作（画面内の戻る・端末の戻る）で前の画面と選択状態に戻る。
+ * 一覧から詳細へ進んで戻ったときは、一覧のスクロール位置も元に戻す
+ */
 function useNavStack(): Nav {
   const [stack, setStack] = useState<Route[]>([{ tab: "home" }]);
   const ref = useRef(stack);
   ref.current = stack;
+  const scrolls = useRef<number[][]>([]);
+  const prevLen = useRef(1);
+  useLayoutEffect(() => {
+    if (stack.length < prevLen.current) {
+      const pos = scrolls.current[stack.length - 1];
+      if (pos) requestAnimationFrame(() => restoreScroll(pos));
+    }
+    prevLen.current = stack.length;
+  }, [stack]);
   useEffect(() => {
     const onPop = () => {
       if (ref.current.length > 1) setStack((s) => s.slice(0, -1));
@@ -57,10 +83,14 @@ function useNavStack(): Nav {
         } catch {
           /* 履歴が使えなくても画面内の戻るは動く */
         }
+        scrolls.current[ref.current.length - 1] = captureScroll();
         setStack((s) => [...s, r]);
       },
       replace: (r) => setStack((s) => [...s.slice(0, -1), r]),
-      switchTab: (t) => setStack([TAB_ROOT[t]]),
+      switchTab: (t) => {
+        scrolls.current = [];
+        setStack([TAB_ROOT[t]]);
+      },
       back: () => {
         if (ref.current.length <= 1) return;
         try {
@@ -228,7 +258,7 @@ function OwnerInner({
         }}
         onNotices={() => setSheet("notices")}
         onSettings={() => setSheet("settings")}
-        badges={{ stable: unread }}
+        badges={{ home: items.filter((t) => t.importance === "urgent").length, stable: unread }}
       >
         {r.tab === "home" && <OwnerHome key="home" />}
         {r.tab === "horses" && <HorsesScreen key={`horses-${r.detail ? r.horseId : "list"}`} route={r} />}

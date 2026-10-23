@@ -28,7 +28,8 @@ import {
 } from "@owners/shared";
 
 export type Importance = "urgent" | "check" | "normal";
-export const IMPORTANCE_LABELS: Record<Importance, string> = { urgent: "緊急", check: "要確認", normal: "通常" };
+/** 重要度の表示。期限や条件のないものを急ぎ扱いしない（要対応＝放っておくと問題が起きる、確認＝判断の機会、お知らせ＝情報） */
+export const IMPORTANCE_LABELS: Record<Importance, string> = { urgent: "要対応", check: "確認", normal: "お知らせ" };
 
 export type ReportKind = "injury" | "discovery" | "proposal" | "warning" | "training";
 export const REPORT_KIND_LABELS: Record<ReportKind, string> = {
@@ -58,7 +59,9 @@ export function classifyReport(r: WeeklyReport, read: ReadonlySet<string>, curre
   const proposal = r.lines.find((l) => l.startsWith("提案：")) ?? null;
   const injury = r.alerts.some((a) => /痛め|故障/.test(a));
   const kind: ReportKind = injury ? "injury" : r.alerts.length ? "warning" : r.discoveries.length ? "discovery" : proposal ? "proposal" : "training";
-  const importance: Importance = injury ? "urgent" : r.alerts.length || r.discoveries.length || proposal ? "check" : "normal";
+  // 提案は回答できる週だけ「確認」。新しい見立ては情報なので「お知らせ」
+  const replyable = !!proposal && r.week === currentWeek - 1;
+  const importance: Importance = injury ? "urgent" : r.alerts.length || replyable ? "check" : "normal";
   const obs = r.lines.find((l) => l.startsWith("観察："));
   const summary = injury
     ? r.alerts[0]
@@ -192,7 +195,7 @@ export function todos(save: OwnerSave, vm: OwnerVM): TodoItem[] {
     out.push({ id: "reply", importance: "check", title: `調教師の提案 ${replies.length}件`, detail: replies[0].summary, action: { label: "回答する", to: "report", arg: replies[0].id } });
   const found = vm.reports.filter((r) => r.unread && r.report.discoveries.length);
   if (found.length)
-    out.push({ id: "found", importance: "check", title: "新しい能力情報", detail: found[0].report.discoveries[0], horseId: found[0].report.horseId, action: { label: "見立てを見る", to: "horse", arg: found[0].report.horseId } });
+    out.push({ id: "found", importance: "normal", title: "新しい能力の見立て", detail: found[0].report.discoveries[0], horseId: found[0].report.horseId, action: { label: "見立てを見る", to: "horse", arg: found[0].report.horseId } });
   if (save.player.money < 0)
     out.push({ id: "money", importance: "urgent", title: "所持金がマイナス", detail: "売却や出走で資金を立て直してください", action: { label: "所有馬", to: "horse" } });
   if (vm.horses.length === 0)
