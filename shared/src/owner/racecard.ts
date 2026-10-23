@@ -181,6 +181,31 @@ export function programRequirement(p: OwnerProgram, h: RaceHorse, week: number):
 
 const CPU_STYLES: RunningStyle[] = ["front", "stalker", "stalker", "closer", "closer", "deep"];
 
+/**
+ * CPU馬の能力の配分の傾向。タイプは新しい能力値やクラスとして持たせるのではなく、
+ * 能力の偏りとして表れる（総合力＝6能力の平均はクラスの範囲に保つ）。
+ * 並びは ABILITY_KEYS（スピード・加速・スタミナ・パワー・根性・賢さ）の順
+ */
+export const CPU_PROFILES: readonly { key: string; offsets: readonly number[]; styles: readonly RunningStyle[] }[] = [
+  { key: "balanced", offsets: [0, 0, 0, 0, 0, 0], styles: CPU_STYLES },
+  { key: "speed", offsets: [9, 5, -9, 0, -2, -3], styles: ["front", "front", "stalker", "stalker", "closer"] },
+  { key: "stamina", offsets: [-4, -6, 11, 2, 3, -6], styles: ["front", "stalker", "stalker", "closer", "deep"] },
+  { key: "kick", offsets: [2, 10, -4, -5, 1, -4], styles: ["stalker", "closer", "closer", "deep", "deep"] },
+  { key: "power", offsets: [-3, -3, 0, 11, 5, -10], styles: ["front", "stalker", "stalker", "closer"] },
+];
+
+/** CPU馬の能力の配分（総合力を保ったまま偏りをつける） */
+function cpuAbilities(lvl: number, rng: Rng, typeRng: Rng): { abilities: Abilities; profile: (typeof CPU_PROFILES)[number] } {
+  const profile = CPU_PROFILES[Math.floor(typeRng() * CPU_PROFILES.length)];
+  const mag = 0.5 + typeRng() * 0.8;
+  const raw = ABILITY_KEYS.map((_, k) => lvl + profile.offsets[k] * mag + gaussian(rng) * 5);
+  // 総合力（平均）がクラスの水準からずれないように中心を戻す
+  const shift = lvl - raw.reduce((a, b) => a + b, 0) / raw.length;
+  const abilities = {} as Abilities;
+  ABILITY_KEYS.forEach((k, i) => (abilities[k] = Math.max(15, Math.min(100, Math.round(raw[i] + shift)))));
+  return { abilities, profile };
+}
+
 function cpuTraits(rng: Rng): TraitId[] {
   const out: TraitId[] = [];
   const n = randInt(rng, 0, 2);
@@ -205,8 +230,9 @@ export function generateCpuEntries(p: OwnerProgram, count: number, seed: number,
   for (let i = 0; i < count; i++) {
     const rng = createRng((seed ^ Math.imul(i + 1, 0x9e3779b1)) >>> 0);
     const lvl = def.level[0] + rng() * (def.level[1] - def.level[0]);
-    const abilities = {} as Abilities;
-    for (const k of ABILITY_KEYS) abilities[k] = Math.max(15, Math.min(100, Math.round(lvl + gaussian(rng) * 5)));
+    // タイプの抽選は別の乱数列で行い、名前・個性などの抽選の並びは変えない
+    const typeRng = createRng(hash32(`cpu-type|${seed}|${i}`));
+    const { abilities, profile } = cpuAbilities(lvl, rng, typeRng);
     const traits = cpuTraits(rng);
     const apt = genAptitude(abilities, traits, rng);
     // 多くの馬は条件に合うように出てくる
@@ -219,7 +245,9 @@ export function generateCpuEntries(p: OwnerProgram, count: number, seed: number,
       if (p.course.surface === "turf") apt.turf = Math.max(apt.turf, 65);
       else apt.dirt = Math.max(apt.dirt, 65);
     }
-    const style = pick(rng, CPU_STYLES);
+    // 能力の傾向に合った脚質を選びやすい（半分は従来どおり無作為）
+    const style0 = pick(rng, CPU_STYLES);
+    const style = typeRng() < 0.5 ? pick(typeRng, profile.styles) : style0;
     apt.styles[style] = Math.max(apt.styles[style], 70);
     const name = generateHorseName(rng, taken);
     taken.add(name);

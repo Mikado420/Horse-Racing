@@ -28,6 +28,8 @@ import {
   runTrials,
   simulateOwnerRace,
   baseTopSpeed,
+  CLASS_DEFS,
+  generateCpuEntries,
   firstCornerDistance,
   predictPace,
   thisWeekCard,
@@ -687,6 +689,112 @@ test("スタミナが切れても急に止まらず、徐々に速度が落ち�
   assert.ok(faded >= 5, `スタミナ切れ ${faded}/10`);
 });
 
+/* ---------------- 第4段階：コース・枠順・馬群・CPU馬 ---------------- */
+
+test("コース・距離・馬場・坂・小回りの条件が走りに表れる", () => {
+  const winPerM = (track: string, surface: "turf" | "dirt", dist: number, going: "good" | "heavy") => {
+    let sum = 0;
+    for (let s = 0; s < 15; s++) sum += simulateOwnerRace(field(), { course: makeCourse(track, surface, dist), going }, 600 + s).results[0].timeMs / dist;
+    return sum / 15;
+  };
+  // 道悪は時計がかかる
+  assert.ok(winPerM("midorigaoka", "turf", 1800, "heavy") > winPerM("midorigaoka", "turf", 1800, "good"));
+  // 小回り（コーナーがきつい）は同じ距離でも時計がかかる
+  assert.ok(winPerM("shiomi", "turf", 1800, "good") > winPerM("midorigaoka", "turf", 1800, "good"));
+  // パワーのある馬は道悪・坂・コーナーで不利が小さい
+  const posOf = (power: number, going: "good" | "heavy") => {
+    let sum = 0;
+    for (let s = 0; s < 40; s++) {
+      const me = runner("m", 1, 60, { abilities: { ...runner("x", 1, 60).abilities, power } });
+      sum += simulateOwnerRace(starField(me, s), { course: makeCourse("midorigaoka", "turf", 2000), going }, 700 + s).results.find((r) => r.id === "m")!.position;
+    }
+    return sum / 40;
+  };
+  const gain = (posOf(40, "heavy") - posOf(90, "heavy")) - (posOf(40, "good") - posOf(90, "good"));
+  assert.ok(gain > 0, `道悪でのパワーの差 ${gain}`);
+});
+
+test("枠順の影響は最初のコーナーまでの距離で変わる（コーナーが近いほど外枠は外を回らされる）", () => {
+  const extra = (course: ReturnType<typeof makeCourse>, gate: number) => {
+    let sum = 0;
+    for (let s = 0; s < 30; s++) {
+      const rs = field().map((r) => ({ ...r, tactics: { ...r.tactics, style: "stalker" as const } }));
+      const me = rs.find((r) => r.gate === gate)!;
+      sum += simulateOwnerRace(rs, { course, going: "good" }, 800 + s).telemetry[me.id].extraMeters;
+    }
+    return sum / 30;
+  };
+  const near = makeCourse("shiomi", "turf", 1800);
+  const far = makeCourse("midorigaoka", "turf", 1200);
+  assert.ok(firstCornerDistance(near) < firstCornerDistance(far));
+  const dNear = extra(near, 8) - extra(near, 1);
+  const dFar = extra(far, 8) - extra(far, 1);
+  assert.ok(dNear > 0 && dNear > dFar, `外枠の余分な距離：近い ${dNear.toFixed(1)}m／遠い ${dFar.toFixed(1)}m`);
+});
+
+test("賢い馬は前が詰まりにくい（馬群の中で進路を早めに選ぶ）", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 1800), going: "good" as const };
+  const blocked = (raceSense: number) => {
+    let sum = 0;
+    for (let s = 0; s < 60; s++) {
+      const me = runner("m", 1, 60, { tactics: { style: "closer", pace: "normal", spurt: "normal" }, abilities: { ...runner("x", 1, 60).abilities, raceSense } });
+      sum += simulateOwnerRace(starField(me, s), cond, 900 + s).telemetry.m.blockedSec;
+    }
+    return sum / 60;
+  };
+  const wise = blocked(95);
+  const naive = blocked(20);
+  assert.ok(wise < naive, `前が詰まった時間 賢い ${wise.toFixed(2)}秒／そうでない ${naive.toFixed(2)}秒`);
+});
+
+test("走行距離と記録が不正な値にならない（余分な距離は0以上、全馬がゴール地点に達する）", () => {
+  for (const going of ["good", "heavy"] as const) for (const [t, sf, d] of [["shiomi", "dirt", 1000], ["midorigaoka", "turf", 3000]] as const) {
+    const sim = simulateOwnerRace(paceField(3, 2), { course: makeCourse(t, sf, d), going }, 31);
+    const last = sim.frames[sim.frames.length - 1];
+    for (const x of last) assert.ok(Number.isFinite(x) && x >= d, `${t}${d} 最終位置 ${x}`);
+    for (const l of sim.lanes.flat()) assert.ok(l >= 0 && l <= makeCourse(t, sf, d).trackWidth, `進路 ${l}`);
+    for (const tel of Object.values(sim.telemetry)) {
+      assert.ok(tel.extraMeters >= 0);
+      assert.ok(tel.splits.every((x, i, a) => i === 0 || x > a[i - 1]));
+    }
+  }
+});
+
+test("CPU馬は総合力をクラスに保ったまま能力配分に個性があり、特定のタイプだけが勝つことはない", () => {
+  const p = raceCard(80).find((x) => x.classId === "c1")!;
+  const def = CLASS_DEFS[p.classId];
+  let spread = 0;
+  const shapes = new Set<string>();
+  for (let s = 0; s < 40; s++) {
+    for (const c of generateCpuEntries(p, 8, 50 + s)) {
+      const v = ABILITY_KEYS.map((k) => c.runner.abilities[k]);
+      const mean = v.reduce((a, b) => a + b, 0) / v.length;
+      assert.ok(mean >= def.level[0] - 4 && mean <= def.level[1] + 4, `総合力 ${mean}`);
+      spread += Math.max(...v) - Math.min(...v);
+      shapes.add(ABILITY_KEYS[v.indexOf(Math.max(...v))]);
+    }
+  }
+  assert.ok(spread / 320 > 14, `能力の幅 ${spread / 320}`);
+  assert.ok(shapes.size >= 5, `いちばん高い能力の種類 ${[...shapes]}`);
+  // いちばん高い能力ごとの勝率：どれも極端に偏らない
+  const wins: Record<string, [number, number]> = {};
+  const progs = Array.from({ length: 48 }, (_, w) => raceCard(w + 40)).flat();
+  for (let k = 0; k < 300; k++) {
+    const q = progs[k % progs.length];
+    const cpus = generateCpuEntries(q, 8, 3000 + k);
+    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: q.course, going: q.going }, 5000 + k);
+    for (const c of cpus) {
+      const v = ABILITY_KEYS.map((key) => c.runner.abilities[key]);
+      const top = ABILITY_KEYS[v.indexOf(Math.max(...v))];
+      const w = (wins[top] ??= [0, 0]);
+      w[0]++;
+      if (sim.results[0].id === c.runner.id) w[1]++;
+    }
+  }
+  const rates = Object.values(wins).filter(([n]) => n >= 150).map(([n, w]) => w / n);
+  assert.ok(Math.max(...rates) < 0.3 && Math.max(...rates) < 3 * Math.min(...rates), JSON.stringify(wins));
+});
+
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
   let s = newOwnerGame("テスト", 8);
   s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
@@ -751,6 +859,7 @@ test("レース計算の結果が基準値と完全に一致する（UI・3D の
   // ・レース計算の再設計 第1段階（脚質と最高速度の分離・全馬同時更新）で更新
   // ・第2段階（ペース予測・先頭争い・単騎逃げ）で更新
   // ・第3段階（徐々に落ちる失速・消耗要因・仕掛けの判断）で更新
-  assert.equal(_hash(acc), 889917125);
-  assert.equal(acc.length, 13003);
+  // ・第4段階（コーナーの減速・進路判断・CPU馬の能力配分）で更新
+  assert.equal(_hash(acc), 539156514);
+  assert.equal(acc.length, 12970);
 });

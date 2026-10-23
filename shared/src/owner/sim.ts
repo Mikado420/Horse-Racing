@@ -192,10 +192,9 @@ export function baseTopSpeed(r: SimRunner, cond: SimConditions, cfg: GameConfig 
   const surfaceMul = fitMultiplier(c.surface === "turf" ? apt.turf : apt.dirt, 0.06);
   const goingMul = 1 - g * 0.01 * (1 - a.power / 130) - (g > 0 ? 0.035 * (1 - apt.heavy / 100) * (g / 3) : 0);
   const dirMul = fitMultiplier(c.direction === "right" ? apt.right : apt.left, 0.02);
-  const tightMul = c.tight ? fitMultiplier(apt.tight, 0.02) : 1;
   const condMul = (1 + 0.012 * r.condition) * (1 - 0.0008 * r.fatigue) * (0.95 + 0.05 * (r.fitness / 100));
   const distSpeed = under ? 1 - de.shortSpeed * (1 - distF) : over ? 1 - de.longSpeed * (1 - distF) : 1;
-  return (16.6 + 0.034 * a.speed) * surfaceMul * goingMul * dirMul * tightMul * condMul * distSpeed;
+  return (16.6 + 0.034 * a.speed) * surfaceMul * goingMul * dirMul * condMul * distSpeed;
 }
 
 /** 1頭分の能力・適性・状態から、速度・加速・エネルギーの係数を作る */
@@ -451,7 +450,8 @@ export function simulateOwnerRace(
     if (battle > 0.3) battleSec += dt;
     if (leaderD > T.flowRamp[1]) {
       // 実際の流れ（出走馬全体の速さに対する先頭の速度）と先頭争いの激しさから、ペース指数をゆっくり動かす
-      const ref = leaderD < earlyEnd ? T.paceRefEarly : T.cruise.mid;
+      // コーナーではどの馬も速度を落とすので、その分を基準から差し引く
+      const ref = (leaderD < earlyEnd ? T.paceRefEarly : T.paceRefMid) * (isCorner(c, leaderD) ? 1 - T.cornerSpeedK / R : 1);
       const obs = clamp((paceV / fieldTop - ref) / T.paceObsScale + T.battlePace * battle, -1.5, 1.5);
       paceIdx += (clamp(obs, -1, 1) - paceIdx) * paceIdxK;
       if (leaderD < earlyEnd + 200) {
@@ -602,6 +602,13 @@ export function simulateOwnerRace(
       }
 
       if (!done) {
+        // コーナー：きついほど速度を落とす。パワー・回りの適性・小回り適性があれば保ちやすい
+        if (isCorner(c, d0[i])) {
+          const pw = r.abilities.power / 100;
+          const dirFit = (c.direction === "right" ? r.aptitude.right : r.aptitude.left) / 100;
+          const tightPen = c.tight ? 1 + T.tightCornerPenalty * (1 - r.aptitude.tight / 100) : 1;
+          target *= 1 - (T.cornerSpeedK / R) * (1 - T.cornerPower * pw - T.cornerAptitude * dirFit) * tightPen;
+        }
         // 坂
         if (c.slope && remain <= SLOPE_REMAIN[0] && remain >= SLOPE_REMAIN[1]) {
           target *= 1 - 0.03 * (1 - r.abilities.power / 120) * (1 - 0.5 * (r.aptitude.slope / 100));
@@ -633,22 +640,86 @@ export function simulateOwnerRace(
         // 前が詰まる（前の馬より速く走りたいのに抜けない）
         st.wantOut = false;
         if (blockedBy >= 0 && d0[i] > 150 && target > v0[blockedBy] + 0.2) {
+          // 少し速く走りたいだけなら後ろで流れに乗る。はっきり行きたいのに抜けないとき（前の馬が止まった・
+          // 仕掛けたいのに前が遅い）が「前が詰まった」状態
+          const stuck = target > v0[blockedBy] + T.blockedMargin;
           target = Math.min(target, v0[blockedBy] + 0.05);
-          st.tel.blockedSec += dt;
-          st.wantOut = true;
+          if (stuck) {
+            st.tel.blockedSec += dt;
+            st.wantOut = true;
+          }
         }
       }
 
       // 進路取り：詰まったら外へ出す。そうでなければ序盤・中盤は内へ寄せる
       if (decide && !done) {
-        if (st.wantOut && blockedBy >= 0) {
-          const outside = l0[blockedBy] + 1.6;
-          if (rng() < 0.55 + st.rs / 250) st.targetLane = Math.min(c.trackWidth - 1, outside);
+        // 前の遅い馬：詰まってから気づくのではなく、賢い馬ほど早めに気づいて進路を考える
+        let slow = st.wantOut ? blockedBy : -1;
+        if (slow < 0 && d0[i] > 150 && (st.phase === "spurt" || remain < spurtFrom[i] + T.preSpurtLead)) {
+          const look = 2.6 + T.lookAhead * (st.rs / 100);
+          for (let j = 0; j < n; j++) {
+            const gap = d0[j] - d0[i];
+            if (j !== i && !done0[j] && gap > 0 && gap < look && Math.abs(l0[j] - l0[i]) < 1.25 && v0[j] < target - T.blockedMargin && (slow < 0 || d0[j] < d0[slow])) slow = j;
+          }
+        }
+        // 進路が開いているか：賢い馬ほど狭い隙間も見逃さない（必要な前後の余裕が小さい）
+        const room = T.gapRoom - T.gapRoomWise * (st.rs / 100);
+        const free = (lane: number) => {
+          for (let j = 0; j < n; j++) if (j !== i && j !== slow && Math.abs(l0[j] - lane) < 1.2 && Math.abs(d0[j] - d0[i]) < room) return false;
+          return true;
+        };
+        // 仕掛けの前の進路確保：賢い馬は動き出す前に、前が開いている外へ持ち出しておく
+        // （コーナーで大きく外へ出すと距離を損するので、コーナーでは1頭分だけ）
+        if (slow < 0 && st.phase === "mid" && remain < spurtFrom[i] + T.preSpurtLead && rng() < T.preSpurtMove * (st.rs / 100)) {
+          const clearAhead = (lane: number) => {
+            for (let j = 0; j < n; j++) {
+              const gap = d0[j] - d0[i];
+              if (j !== i && !done0[j] && gap > 0 && gap < 10 && Math.abs(l0[j] - lane) < 1.25) return false;
+            }
+            return true;
+          };
+          // 前に馬がいれば、すぐ外から順に「並ばれておらず前も開いている」進路を探す（外へ行くほど距離を損する）
+          if (!clearAhead(l0[i])) {
+            for (let k = 1; k <= (isCorner(c, d0[i]) ? 1 : 3); k++) {
+              const lane2 = l0[i] + 1.6 * k;
+              if (lane2 > c.trackWidth - 1) break;
+              if (free(lane2) && clearAhead(lane2)) {
+                st.targetLane = lane2;
+                break;
+              }
+            }
+          }
+        }
+        if (slow >= 0) {
+          // 進路の候補：すぐ外・その馬の内・さらに外。開いているか、どれだけ距離を損するかで選ぶ
+          const late = remain < c.straightLength + 100;
+          const cornerNow = isCorner(c, d0[i]);
+          const out1 = Math.min(c.trackWidth - 1, l0[slow] + 1.6);
+          const in1 = l0[slow] - 1.6;
+          let choice: number | null = null;
+          if (in1 >= 0.6 && free(in1) && rng() < 0.25 + st.rs / 200) choice = in1;
+          else if (free(out1)) choice = out1;
+          else if (late || st.phase === "spurt" || st.tel.blockedSec > 4) {
+            // 外が塞がっている：さらに外を回るか、開くのを待つか
+            let far = out1;
+            for (let j = 0; j < n; j++) if (j !== i && Math.abs(d0[j] - d0[i]) < 3.5 && l0[j] >= out1 - 1.2) far = Math.max(far, l0[j] + 1.6);
+            far = Math.min(c.trackWidth - 1, far);
+            if (far > out1 && free(far) && rng() < (late ? 0.6 : 0.3) * (1 - 0.4 * (st.rs / 100) * (cornerNow ? 1 : 0))) choice = far;
+          }
+          // コーナーでの外への持ち出しは損が大きいので、賢い馬は直線まで待つことがある
+          // （実際に詰まっているときは待たない）
+          if (choice !== null && !st.wantOut && choice > l0[i] && cornerNow && !late && rng() < T.waitInCorner * (st.rs / 100)) choice = null;
+          // 反応の早さ：賢いほど迷わず進路を選ぶ。早めに気づいた段階では賢い馬だけが動く
+          const react = st.wantOut ? 0.45 + 0.55 * (st.rs / 100) : (st.rs / 100) * 0.8;
+          if (choice !== null && rng() < react) st.targetLane = choice;
         } else if (st.phase === "early" || st.phase === "mid") {
           const inside = Math.max(0.6, l0[i] - 1.2);
           let occupied = false;
           for (let j = 0; j < n; j++) if (j !== i && Math.abs(l0[j] - inside) < 1.1 && Math.abs(d0[j] - d0[i]) < 3.2) occupied = true;
-          if (!occupied && rng() < 0.4 + st.rs / 250) st.targetLane = inside;
+          // 内へ寄せる先に遅い馬がいれば、賢い馬は入らない（詰まる位置を避ける）
+          let pocket = false;
+          for (let j = 0; j < n; j++) if (j !== i && Math.abs(l0[j] - inside) < 1.2 && d0[j] > d0[i] && d0[j] - d0[i] < 8 && v0[j] < v0[i] - 0.2) pocket = true;
+          if (!occupied && !(pocket && rng() < st.rs / 100) && rng() < 0.4 + st.rs / 250) st.targetLane = inside;
         }
       }
       const laneStep = 0.8 * dt;

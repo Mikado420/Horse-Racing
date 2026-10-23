@@ -68,6 +68,8 @@ export interface SimTuning {
   paceObsScale: number;
   /** 序盤のペース指数の基準（先頭の速度が出走馬全体の速さのこの割合なら平均ペース） */
   paceRefEarly: number;
+  /** 中盤のペース指数の基準 */
+  paceRefMid: number;
   /** ペース指数の平滑化の時定数（秒） */
   paceIndexTau: number;
   /** 先頭争いの激しさがペース指数に加わる量 */
@@ -143,6 +145,26 @@ export interface SimTuning {
   spurtKeep: number;
   spurtForce: number;
 
+  /* ---------- コース・馬群・進路（第4段階） ---------- */
+  /** コーナーでの減速：半径 R(m) に対して K/R の割合。パワー・回りの適性で軽くなる割合 */
+  cornerSpeedK: number;
+  cornerPower: number;
+  cornerAptitude: number;
+  /** 小回りコースで、小回り適性が低いときに減速が増える割合 */
+  tightCornerPenalty: number;
+  /** 前の馬より何 m/秒 以上速く走りたいのに抜けないとき「前が詰まった」とするか */
+  blockedMargin: number;
+  /** 前の遅い馬に気づく距離の、賢さ100での上乗せ（m） */
+  lookAhead: number;
+  /** 仕掛けの何m手前から進路を確保しに動くか、その判断の起こりやすさ（賢さ100で1秒あたり） */
+  preSpurtLead: number;
+  preSpurtMove: number;
+  /** 進路が開いているとみなす前後の余裕（m）と、賢さ100で縮む量 */
+  gapRoom: number;
+  gapRoomWise: number;
+  /** コーナーで外へ持ち出さずに待つ判断（賢さ100での確率） */
+  waitInCorner: number;
+
   /* ---------- その日の出来 ---------- */
   /** 出来のぶれ（最高速度に対する標準偏差）と、スタミナへの効き（最高速度へのぶれの倍率） */
   formSd: number;
@@ -191,7 +213,8 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   predictedLeadAdj: 0.01,
   predictedFieldAdj: 0.004,
   paceObsScale: 0.015,
-  paceRefEarly: 0.945,
+  paceRefEarly: 0.955,
+  paceRefMid: 0.91,
   paceIndexTau: 6,
   battlePace: 0.6,
   battleRange: 3.6,
@@ -239,6 +262,18 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   spurtNeed: 0.92,
   spurtKeep: 0.5,
   spurtForce: 260,
+
+  cornerSpeedK: 2.0,
+  cornerPower: 0.4,
+  cornerAptitude: 0.3,
+  tightCornerPenalty: 0.6,
+  blockedMargin: 0.5,
+  lookAhead: 4,
+  waitInCorner: 0.5,
+  gapRoom: 4,
+  gapRoomWise: 2,
+  preSpurtLead: 250,
+  preSpurtMove: 0.5,
 
   formSd: 0.011,
   formEnergy: 1.5,
