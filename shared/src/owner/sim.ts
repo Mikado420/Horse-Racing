@@ -216,7 +216,7 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
   const styleFit = clamp(apt.styles[r.tactics.style] / 100, 0, 1);
   const top = baseTopSpeed(r, cond, cfg) * form;
   const accel = (1.5 + 0.022 * a.acceleration) * (0.85 + 0.15 * (a.power / 100)) * (under ? 1 - de.shortAccel * (1 - distF) : 1);
-  const energy = (700 + 27 * a.stamina) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100)) * (1 + (form - 1) * T.formEnergy);
+  const energy = (700 + 27 * a.stamina) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100)) * (1 + (form - 1) * T.formEnergy) * T.energyScale;
   const costMul =
     (over ? 1 + de.longStamina * (1 - distF) : 1) *
     (1.05 - 0.07 * (rs / 100)) *
@@ -321,6 +321,27 @@ export function positionCorrection(p: number, band: [number, number], gain: { up
   const half = Math.max(0.01, (hi - lo) / 2);
   corr += T.posCenterPull * gain.up * Math.tanh((p - mid) / (half + sc));
   return corr;
+}
+
+/**
+ * 通過順位から、実際に見せた位置取り（脚質）を判定する。序盤（重み0.45）・残り800m（0.4）・残り400m（0.15）の
+ * 位置の加重平均で決め、序盤だけ前にいて中盤に下がった馬や、早めに進出した馬も実際の走りに近く分類する
+ */
+export function styleFromPositions(positions: readonly { remain: number; pos: number }[], n: number, distance: number): RunningStyle {
+  const at = (remain: number) => positions.find((p) => p.remain === remain)?.pos;
+  const parts: [number | undefined, number][] = [
+    [at(distance - 400), 0.45],
+    [at(800), 0.4],
+    [at(400), 0.15],
+  ];
+  let sum = 0;
+  let w = 0;
+  for (const [pos, wt] of parts) if (pos !== undefined) {
+    sum += (n > 1 ? (pos - 1) / (n - 1) : 0) * wt;
+    w += wt;
+  }
+  const f = w > 0 ? sum / w : 0;
+  return f <= 0.14 ? "front" : f <= 0.42 ? "stalker" : f <= 0.72 ? "closer" : "deep";
 }
 
 /** スタートから最初のコーナーまでの距離（m） */
@@ -489,11 +510,11 @@ export function simulateOwnerRace(
           if (remain <= point + T.spurtSurplusLead) {
             // 残りのエネルギーで最後まで脚が持つか見極めてから仕掛ける（見積もりは騎手の判断でずれる）
             const effort = Math.pow(TOP_REF / st.top, T.costEconomy);
-            const need = remain * st.costMul * effort * Math.pow(st.top / T.costRef, 2) * (1 + st.judgeErr);
+            const need = remain * st.costMul * effort * Math.pow(st.top / T.costRef, 2) * (1 + T.anaerobic * T.anaerobicNeed) * (1 + st.judgeErr);
             const spare = st.energy - T.fadeStart * st.energy0 * T.spurtKeep;
             const go =
               remain <= T.spurtForce ||
-              (remain <= point && spare >= need * T.spurtNeed) ||
+              (remain <= point && spare >= need * T.spurtNeed[r.tactics.spurt]) ||
               spare >= need * T.spurtSurplus; // 手応えに余裕があれば少し早めに動く
             if (go) {
               st.phase = "spurt";
@@ -525,7 +546,11 @@ export function simulateOwnerRace(
       let target: number;
       if (done) target = st.top * 0.6;
       else if (st.phase === "spurt") {
-        target = st.top * (has(r, "closerKick") ? 1.015 : 1.0);
+        // 溜めた脚：残りの距離に対して余力が多いほど、仕掛けてからさらに伸びる（使い切れる分だけ）
+        const effortS = Math.pow(TOP_REF / st.top, T.costEconomy);
+        const needS = Math.max(1, remain) * st.costMul * effortS * Math.pow(st.top / T.costRef, 2) * (1 + T.anaerobic);
+        const saved = clamp((st.energy - T.fadeStart * st.energy0 * T.spurtKeep) / needS - 1, 0, T.saveKickRange) / T.saveKickRange;
+        target = st.top * ((has(r, "closerKick") ? 1.015 : 1.0) + T.saveKick * saved);
       } else {
         const ph = st.phase === "early" ? "early" : "mid";
         const style: RunningStyle = has(r, "frontObsessed") ? "front" : r.tactics.style;
@@ -758,7 +783,9 @@ export function simulateOwnerRace(
           (contending[i] && contest >= 2 ? 1 + T.battleCost * battle : 1) *
           (1 - T.draftSave * draft) *
           corner *
-          slope;
+          slope *
+          // 最高速度に近い全力疾走は、巡航よりずっと消耗が激しい（早仕掛けほど長く払う）
+          (1 + T.anaerobic * Math.pow(clamp((v / st.top - T.anaerobicFrom) / (1 - T.anaerobicFrom), 0, 1), 2));
         // 走る距離のぶん＋加速（緩急の繰り返し）＋横への進路変更
         st.energy -= cost * v * dt + T.accelCost * Math.max(0, v - v0[i]) * (st.phase === "spurt" ? 0.5 : 1) + T.lateralCost * Math.abs(lane - l0[i]);
         if (st.phase !== "spurt" && d0[i] > 200) {
@@ -838,11 +865,9 @@ export function simulateOwnerRace(
       (st.tel.reserve ??= []).push(Math.round((st.checkpointReserve.get(cp) ?? 0) * 100) / 100);
     });
   }
-  // 実際に見せた位置取り（序盤の通過順位から）
+  // 実際に見せた位置取り：序盤だけでなく、中盤・終盤の通過順位も合わせて判定する
   for (const st of S) {
-    const early = st.tel.positions.find((p) => p.remain === D - 400)?.pos ?? 1;
-    const f = n > 1 ? (early - 1) / (n - 1) : 0;
-    st.tel.styleShown = f <= 0.12 ? "front" : f <= 0.42 ? "stalker" : f <= 0.72 ? "closer" : "deep";
+    st.tel.styleShown = styleFromPositions(st.tel.positions, n, D);
     st.tel.splits = st.passTimes.map((x) => Math.round(x * 100) / 100);
     st.tel.last600 = Math.round((st.finish! - (st.late600Start ?? 0)) * 100) / 100;
     st.tel.lastSegSpeed = Math.round((200 / Math.max(0.1, st.finish! - (st.late200Start ?? st.finish! - 12))) * 100) / 100;

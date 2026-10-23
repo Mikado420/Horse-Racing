@@ -1,7 +1,7 @@
 // レース計算（sim.ts）の調整用パラメータ。数値はすべてここに集め、テストや調整では
 // withConfig({ race: { tuning: { ...DEFAULT_SIM_TUNING, ... } } }) で差し替えられる。
 import type { RunningStyle } from "../types";
-import type { PacePlan } from "./sim";
+import type { PacePlan, SpurtPlan } from "./sim";
 
 export interface SimTuning {
   /* ---------- 位置取り（第1段階） ---------- */
@@ -140,10 +140,21 @@ export interface SimTuning {
   /** 手応えに余裕があるとき、目安より何m早く動けるか、その余裕の基準（必要量の倍率） */
   spurtSurplusLead: number;
   spurtSurplus: number;
-  /** 仕掛けに必要とみなす余力の割合、温存しておく余力（fadeStart に対する割合）、必ず仕掛ける地点（m） */
-  spurtNeed: number;
+  /** 仕掛けに必要とみなす余力の割合（作戦ごと。早めの作戦ほど足りなくても動く）、温存しておく余力（fadeStart に対する割合）、必ず仕掛ける地点（m） */
+  spurtNeed: Record<SpurtPlan, number>;
   spurtKeep: number;
   spurtForce: number;
+
+  /** 全力疾走の消耗の増加（最高速度で 1+この値 倍）と、増え始める速さ（最高速度に対する割合） */
+  anaerobic: number;
+  anaerobicFrom: number;
+  /** 仕掛けの判断で見込む全力疾走の消耗の割合（1 で最高速度のまま走り切る想定） */
+  anaerobicNeed: number;
+  /** エネルギー（スタミナ）の総量の倍率 */
+  energyScale: number;
+  /** 溜めた脚：残り距離に必要な分より余力が多いほど最高速度を上乗せできる量と、上乗せが最大になる余裕（必要量に対する超過の割合） */
+  saveKick: number;
+  saveKickRange: number;
 
   /* ---------- コース・馬群・進路（第4段階） ---------- */
   /** コーナーでの減速：半径 R(m) に対して K/R の割合。パワー・回りの適性で軽くなる割合 */
@@ -212,9 +223,9 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   pacePredict: { base: -0.75, perContender: 0.6 },
   predictedLeadAdj: 0.01,
   predictedFieldAdj: 0.004,
-  paceObsScale: 0.015,
-  paceRefEarly: 0.955,
-  paceRefMid: 0.91,
+  paceObsScale: 0.025,
+  paceRefEarly: 0.975,
+  paceRefMid: 0.93,
   paceIndexTau: 6,
   battlePace: 0.6,
   battleRange: 3.6,
@@ -259,9 +270,16 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   spurtLagMeters: 250,
   spurtSurplusLead: 120,
   spurtSurplus: 1.3,
-  spurtNeed: 0.92,
+  spurtNeed: { early: 0.75, normal: 0.92, late: 1 },
   spurtKeep: 0.5,
   spurtForce: 260,
+
+  anaerobic: 0.75,
+  anaerobicFrom: 0.93,
+  anaerobicNeed: 0.7,
+  energyScale: 1.1,
+  saveKick: 0.035,
+  saveKickRange: 0.8,
 
   cornerSpeedK: 2.0,
   cornerPower: 0.4,

@@ -6,7 +6,7 @@ import type { Going, RunningStyle } from "../types";
 import { bandForDistance } from "./aptitude";
 import type { OwnerCourse } from "./courses";
 import { KNOWLEDGE_LABELS, type KnowledgeKey, type TraitId } from "./model";
-import type { RunnerTelemetry, Tactics } from "./sim";
+import type { RacePace, RunnerTelemetry, Tactics } from "./sim";
 import type { ClassId } from "./racecard";
 import { STYLE_LABELS, GOING_LABELS } from "../types";
 import { formatRaceTime } from "../race";
@@ -43,6 +43,8 @@ export interface OwnerRaceRecord {
   field: FieldRow[];
   telemetry: RunnerTelemetry;
   leaderLaps: number[];
+  /** レース全体のペース（レース計算の再設計以降の記録のみ。古い記録にはない） */
+  pace?: RacePace;
   trainerComment: string;
   analyzed: boolean;
 }
@@ -149,7 +151,25 @@ export function analyzeRace(r: OwnerRaceRecord): Finding[] {
     notInformative: [],
   });
 
-  // 6. 条件
+  // 6. レースの流れ（ラップの前半・後半と、先頭争いの有無。再設計前の記録にはペースの情報がないので出さない）
+  if (r.pace && r.leaderLaps.length >= 4) {
+    const L = r.leaderLaps.slice(1); // 発走直後の200mは加速中なので除く
+    const h = Math.floor(L.length / 2);
+    const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+    const first = avg(L.slice(0, h));
+    const second = avg(L.slice(L.length - h));
+    const label = r.pace.label === "high" ? "速い流れ" : r.pace.label === "slow" ? "落ち着いた流れ" : "平均的な流れ";
+    out.push({
+      title: "レースの流れ",
+      text: `先頭の200mごとのラップ（発走直後を除く）は前半平均${first.toFixed(1)}秒、後半平均${second.toFixed(1)}秒。${
+        r.pace.battleSec >= 5 ? "序盤に複数の馬が先頭を争った。" : ""
+      }全体としては${label}だったとみられる。`,
+      informs: [],
+      notInformative: [],
+    });
+  }
+
+  // 7. 条件
   const cond: Finding = { title: "条件", text: "", informs: [], notInformative: [] };
   const band = bandForDistance(D);
   const surfaceKey: KnowledgeKey = r.course.surface === "turf" ? "surface_turf" : "surface_dirt";

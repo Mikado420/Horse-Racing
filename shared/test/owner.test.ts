@@ -28,6 +28,8 @@ import {
   runTrials,
   simulateOwnerRace,
   baseTopSpeed,
+  styleFromPositions,
+  analyzeRace,
   CLASS_DEFS,
   generateCpuEntries,
   firstCornerDistance,
@@ -795,6 +797,56 @@ test("CPU馬は総合力をクラスに保ったまま能力配分に個性が�
   assert.ok(Math.max(...rates) < 0.3 && Math.max(...rates) < 3 * Math.min(...rates), JSON.stringify(wins));
 });
 
+/* ---------------- 第5段階：記録・分析・観戦との連携 ---------------- */
+
+test("観戦用フレームのゴール到達順は着順と一致する（3Dは記録を再生するだけ）", () => {
+  for (let s = 0; s < 20; s++) {
+    const q = raceCard(60 + s)[s % 3];
+    const cpus = generateCpuEntries(q, 8, 70 + s);
+    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: q.course, going: q.going }, 80 + s);
+    const D = q.course.distance;
+    // 各馬がゴールに達したフレーム（フレームは gate 順）
+    const reach = sim.results.map((r) => sim.frames.findIndex((f) => f[r.gate - 1] >= D));
+    for (let k = 1; k < reach.length; k++) assert.ok(reach[k] >= reach[k - 1], `着順 ${k} と ${k + 1} の到達フレーム ${reach[k - 1]} > ${reach[k]}`);
+    // 記録の時刻とフレームの時刻が対応する（記録の間隔の範囲で）
+    sim.results.forEach((r, k) => assert.ok(Math.abs(reach[k] * sim.sampleDt - r.timeMs / 1000) <= sim.sampleDt + 1e-9));
+    assert.ok(sim.durationSec >= sim.results[sim.results.length - 1].timeMs / 1000);
+  }
+});
+
+test("実際の脚質は序盤だけでなく中盤・終盤の位置から判定する", () => {
+  const n = 8;
+  const pos = (early: number, mid: number, late: number) => [
+    { remain: 1600, pos: early },
+    { remain: 800, pos: mid },
+    { remain: 400, pos: late },
+  ];
+  assert.equal(styleFromPositions(pos(1, 1, 1), n, 2000), "front");
+  // 序盤だけハナを切ったが、すぐに中団まで下げた
+  assert.notEqual(styleFromPositions(pos(1, 5, 6), n, 2000), "front");
+  // 後方から早めに進出した
+  assert.equal(styleFromPositions(pos(8, 7, 3), n, 2000), "deep");
+  assert.equal(styleFromPositions(pos(5, 5, 5), n, 2000), "closer");
+});
+
+test("出走記録にペースと各馬の走りの記録が残り、分析でレースの流れを確認できる", () => {
+  let s = newOwnerGame("テスト", 8);
+  s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
+  s = { ...s, week: W2, horses: s.horses.map((h) => ({ ...h, birthYear: 1, state: { ...h.state, fitness: 90 } })) };
+  const h = s.horses[0];
+  const p = thisWeekCard(s).find((x) => !entryProblem(s, h, x))!;
+  const out = runOwnerRace(s, h.id, p.id, { style: "stalker", pace: "normal", spurt: "normal" }, 4);
+  const rec = out.record;
+  assert.ok(rec.pace && ["slow", "average", "high"].includes(rec.pace.label));
+  assert.equal(rec.telemetry.reserve!.length, rec.telemetry.positions.length);
+  assert.ok(rec.telemetry.reserve!.every((x) => x >= 0 && x <= 1));
+  const flow = analyzeRace(rec).find((f) => f.title === "レースの流れ");
+  assert.ok(flow && /前半平均[\d.]+秒、後半平均[\d.]+秒/.test(flow.text), flow?.text);
+  // 古い記録（ペースなし）でも分析が動く
+  const old = { ...rec, pace: undefined, telemetry: { ...rec.telemetry, reserve: undefined, fadeRemain: undefined, leadBattleSec: undefined } };
+  assert.ok(!analyzeRace(old).some((f) => f.title === "レースの流れ"));
+});
+
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
   let s = newOwnerGame("テスト", 8);
   s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
@@ -860,6 +912,7 @@ test("レース計算の結果が基準値と完全に一致する（UI・3D の
   // ・第2段階（ペース予測・先頭争い・単騎逃げ）で更新
   // ・第3段階（徐々に落ちる失速・消耗要因・仕掛けの判断）で更新
   // ・第4段階（コーナーの減速・進路判断・CPU馬の能力配分）で更新
-  assert.equal(_hash(acc), 539156514);
-  assert.equal(acc.length, 12970);
+  // ・第5段階（全力疾走の消耗・溜めた脚・ペース指数の基準調整）で更新
+  assert.equal(_hash(acc), 3800305676);
+  assert.equal(acc.length, 13002);
 });

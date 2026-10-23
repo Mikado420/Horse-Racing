@@ -566,6 +566,7 @@ function buildRecord(
     field,
     telemetry: sim.telemetry[h.id],
     leaderLaps: sim.leaderLaps,
+    pace: sim.pace,
     trainerComment: "",
     analyzed: false,
   };
