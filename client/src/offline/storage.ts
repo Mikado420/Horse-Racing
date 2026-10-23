@@ -5,6 +5,7 @@ import {
   ABILITY_KEYS,
   KNOWLEDGE_KEYS,
   OWNER_SAVE_VERSION,
+  refreshRaceComments,
   STAT_KEYS,
   TRAINERS,
   WEEKS_PER_YEAR,
@@ -75,8 +76,15 @@ function checkHorse(h: unknown, i: number): RaceHorse {
   return h as unknown as RaceHorse;
 }
 
-/** 読み込んだ値を検証してセーブデータとして返す（旧形式はここで変換する） */
+/**
+ * 読み込んだ値を検証してセーブデータとして返す（旧形式はここで変換する）。
+ * 以前のバージョンで保存した調教師のレース後コメントは、レース記録から作り直す（形式は変えない）。
+ */
 export function parseSave(raw: unknown): OwnerSave {
+  return refreshRaceComments(parseSaveFormat(raw));
+}
+
+function parseSaveFormat(raw: unknown): OwnerSave {
   if (!isObj(raw)) bad("形式");
   if (raw.version === 1) return migrateV1(raw);
   if (raw.version !== OWNER_SAVE_VERSION) {

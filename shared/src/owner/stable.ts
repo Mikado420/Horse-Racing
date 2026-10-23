@@ -178,22 +178,26 @@ function workoutText(speedObs: number, accelObs: number, staminaObs: number | nu
   return `${place} 4F ${f4.toFixed(1)} - 1F ${last1.toFixed(1)}`;
 }
 
+/**
+ * 1回の観察から受けた印象（観察には誤差があるので、事実ではなく「印象」として述べる）。
+ * 確かさは、何度も観察を重ねた「見立て」の画面で示す。
+ */
 export const OBS_COMMENT: Record<AbilityKey, [string, string, string]> = {
-  speed: ["脚の回転が軽く、素早い動きが見られる", "スピードは平均的に見える", "速い走りにはまだ物足りなさがある"],
-  acceleration: ["加速時の反応が鋭い", "反応は普通", "エンジンのかかりがゆっくりしている"],
-  stamina: ["運動後の回復が早い", "息の持ちは普通", "速いペースでは終盤に余裕がなくなる"],
-  power: ["走りに力強さがある", "力強さは平均的", "馬体の力強さはまだこれから"],
-  fightingSpirit: ["負けん気が強い", "気の強さは普通", "併せると気持ちが引いてしまう面がある"],
-  raceSense: ["落ち着きがあり、指示に従いやすい", "指示への反応は普通", "周りに気を取られやすい"],
+  speed: ["脚の回転が軽く、素早く動けている印象です", "スピードは平均的に見えます", "速い走りにはまだ物足りなさがある印象です"],
+  acceleration: ["加速の反応は鋭いように見えます", "反応は普通に見えます", "エンジンのかかりはゆっくりしている印象です"],
+  stamina: ["運動後の回復は早いように見えます", "息の持ちは普通に見えます", "速いペースでは終盤に余裕がなくなるように見えます"],
+  power: ["走りに力強さがあるように見えます", "力強さは平均的に見えます", "馬体の力強さはまだこれからという印象です"],
+  fightingSpirit: ["負けん気は強いように見えます", "気の強さは普通に見えます", "併せると気持ちが引いてしまう面があるように見えます"],
+  raceSense: ["落ち着きがあり、指示に従いやすい印象です", "指示への反応は普通に見えます", "周りに気を取られやすいように見えます"],
 };
 
 const FARM_COMMENT: Record<AbilityKey, [string, string, string]> = {
-  speed: ["脚の運びが柔らかい", "歩様は素直", "まだ体の使い方がぎこちない"],
-  acceleration: ["身のこなしが軽い", "動きは年相応", "反応はおっとりしている"],
-  stamina: ["よく動いても息が上がりにくい", "体力は年相応", "疲れやすい様子がある"],
-  power: ["馬体のバランスが良い", "体つきは年相応", "まだ線が細い"],
-  fightingSpirit: ["仲間との駆けっこで負けず嫌いなところを見せる", "おとなしい", "群れの後ろにいることが多い"],
-  raceSense: ["人に従順で落ち着いている", "人への反応は普通", "物音に敏感な様子がある"],
+  speed: ["脚の運びが柔らかいように見えます", "歩様は素直に見えます", "まだ体の使い方がぎこちない印象です"],
+  acceleration: ["身のこなしは軽いように見えます", "動きは年相応に見えます", "反応はおっとりしている印象です"],
+  stamina: ["よく動いても息が上がりにくいように見えます", "体力は年相応に見えます", "疲れやすいように見えます"],
+  power: ["馬体のバランスは良いように見えます", "体つきは年相応に見えます", "まだ線が細い印象です"],
+  fightingSpirit: ["仲間との駆けっこで負けず嫌いなところを見せることがあります", "おとなしい印象です", "群れの後ろにいることが多いように見えます"],
+  raceSense: ["人に従順で落ち着いている印象です", "人への反応は普通に見えます", "物音に敏感なように見えます"],
 };
 
 function level(v: number): 0 | 1 | 2 {
@@ -368,8 +372,10 @@ export function runStableWeek(
     const tScale = skillScale(trainer, "raceSense");
     for (const t of TRAIT_IDS) {
       if (TRAIT_DEFS[t].seenIn !== "both") continue;
+      // 兆候は、その個性を本当に持つ馬の行動としてだけ報告する（持たない馬に兆候を作らない）。
+      // 乱数の消費順を変えないよう、持たない馬でも同じ回数だけ乱数を引く
       const hasTrait = truth.traits.includes(t);
-      const p = hasTrait ? (stage <= 1 ? 0.1 : 0.2) / tScale : 0.004 * tScale;
+      const p = hasTrait ? (stage <= 1 ? 0.1 : 0.2) / tScale : 0;
       const seen = rng() < p;
       if (seen) {
         knowledge = recordTraitSign(knowledge, t, true, week, label, cfg);

@@ -104,10 +104,8 @@ export interface SimTuning {
   paceLabelAt: number;
 
   /* ---------- スタミナと仕掛け（第3段階） ---------- */
-  /** 残りエネルギーの割合がこれを下回ると速度を保てなくなり始める */
-  fadeStart: number;
-  /** 余力が尽きても保てる速度（最高速度に対する割合）と、根性・勝負根性による上乗せ */
-  fadeFloor: number;
+  /* 失速が始まる余力の割合（fadeReserve）と尽きたときに保てる速度（emptyFloor）は cfg.race にある */
+  /** 余力が尽きたときの速度への、根性・勝負根性による上乗せ */
   fadeGrit: number;
   gutsyGrit: number;
   /** 余力が減るにつれて速度が落ちる曲線（1 で直線、小さいほど終わり際に急） と根性による粘り */
@@ -140,7 +138,7 @@ export interface SimTuning {
   /** 手応えに余裕があるとき、目安より何m早く動けるか、その余裕の基準（必要量の倍率） */
   spurtSurplusLead: number;
   spurtSurplus: number;
-  /** 仕掛けに必要とみなす余力の割合（作戦ごと。早めの作戦ほど足りなくても動く）、温存しておく余力（fadeStart に対する割合）、必ず仕掛ける地点（m） */
+  /** 仕掛けに必要とみなす余力の割合（作戦ごと。早めの作戦ほど足りなくても動く）、温存しておく余力（cfg.race.fadeReserve に対する割合）、必ず仕掛ける地点（m） */
   spurtNeed: Record<SpurtPlan, number>;
   spurtKeep: number;
   spurtForce: number;
@@ -150,8 +148,8 @@ export interface SimTuning {
   anaerobicFrom: number;
   /** 仕掛けの判断で見込む全力疾走の消耗の割合（1 で最高速度のまま走り切る想定） */
   anaerobicNeed: number;
-  /** エネルギー（スタミナ）の総量の倍率 */
-  energyScale: number;
+  /** スタミナが有酸素で賄える量にも効く度合い（スタミナ 60 を基準に、100 あたりの増減。持久戦ほど差になる） */
+  aerobicStamina: number;
   /** 溜めた脚：残り距離に必要な分より余力が多いほど最高速度を上乗せできる量と、上乗せが最大になる余裕（必要量に対する超過の割合） */
   saveKick: number;
   saveKickRange: number;
@@ -159,6 +157,8 @@ export interface SimTuning {
   /* ---------- コース・馬群・進路（第4段階） ---------- */
   /** コーナーでの減速：半径 R(m) に対して K/R の割合。パワー・回りの適性で軽くなる割合 */
   cornerSpeedK: number;
+  /** コーナーの入口・出口で、外を回る距離のロスが 0 から最大まで変わるのにかける距離（m） */
+  cornerEase: number;
   cornerPower: number;
   cornerAptitude: number;
   /** 小回りコースで、小回り適性が低いときに減速が増える割合 */
@@ -177,8 +177,7 @@ export interface SimTuning {
   waitInCorner: number;
 
   /* ---------- その日の出来 ---------- */
-  /** 出来のぶれ（最高速度に対する標準偏差）と、スタミナへの効き（最高速度へのぶれの倍率） */
-  formSd: number;
+  /** 出来のぶれ（標準偏差は cfg.race.formSd）のスタミナへの効き（最高速度へのぶれの倍率） */
   formEnergy: number;
 
   /* ---------- エネルギー ---------- */
@@ -224,8 +223,8 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   predictedLeadAdj: 0.01,
   predictedFieldAdj: 0.004,
   paceObsScale: 0.025,
-  paceRefEarly: 0.975,
-  paceRefMid: 0.93,
+  paceRefEarly: 0.99,
+  paceRefMid: 0.934,
   paceIndexTau: 6,
   battlePace: 0.6,
   battleRange: 3.6,
@@ -246,8 +245,6 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   slowBandShift: 0.15,
   paceLabelAt: 0.3,
 
-  fadeStart: 0.18,
-  fadeFloor: 0.86,
   fadeGrit: 0.05,
   gutsyGrit: 0.012,
   fadeCurve: 0.7,
@@ -277,11 +274,12 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   anaerobic: 0.75,
   anaerobicFrom: 0.93,
   anaerobicNeed: 0.7,
-  energyScale: 1.1,
+  aerobicStamina: 0.9,
   saveKick: 0.035,
   saveKickRange: 0.8,
 
   cornerSpeedK: 2.0,
+  cornerEase: 20,
   cornerPower: 0.4,
   cornerAptitude: 0.3,
   tightCornerPenalty: 0.6,
@@ -293,7 +291,6 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   preSpurtLead: 250,
   preSpurtMove: 0.5,
 
-  formSd: 0.011,
   formEnergy: 1.5,
 
   costRef: 17.5,

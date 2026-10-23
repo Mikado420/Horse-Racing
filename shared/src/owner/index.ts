@@ -16,3 +16,4 @@ export * from "./stable";
 export * from "./view";
 export * from "./game";
 export * from "./lab";
+export * from "./report";

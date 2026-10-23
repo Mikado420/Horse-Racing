@@ -30,6 +30,8 @@ import {
   baseTopSpeed,
   styleFromPositions,
   analyzeRace,
+  buildRaceReport,
+  lapText,
   CLASS_DEFS,
   generateCpuEntries,
   firstCornerDistance,
@@ -840,11 +842,15 @@ test("出走記録にペースと各馬の走りの記録が残り、分析で�
   assert.ok(rec.pace && ["slow", "average", "high"].includes(rec.pace.label));
   assert.equal(rec.telemetry.reserve!.length, rec.telemetry.positions.length);
   assert.ok(rec.telemetry.reserve!.every((x) => x >= 0 && x <= 1));
-  const flow = analyzeRace(rec).find((f) => f.title === "レースの流れ");
-  assert.ok(flow && /前半平均[\d.]+秒、後半平均[\d.]+秒/.test(flow.text), flow?.text);
-  // 古い記録（ペースなし）でも分析が動く
+  // レースの流れは、分析（report.ts）が記録のラップから判断して示す（main の分析の再設計に合わせて、
+  // 計算内部のペース指数ではなく、誰でも確かめられるラップを根拠にする）
+  const rep = buildRaceReport(rec);
+  assert.ok(rep.facts.pace !== null && ["fast", "even", "slow"].includes(rep.facts.pace));
+  assert.ok(rep.facts.laps.length >= 4 && /^[\d.]+( - [\d.]+)+$/.test(lapText(rep.facts)), lapText(rep.facts));
+  // 古い記録（ペース・余力の記録なし）でも分析が動く
   const old = { ...rec, pace: undefined, telemetry: { ...rec.telemetry, reserve: undefined, fadeRemain: undefined, leadBattleSec: undefined } };
-  assert.ok(!analyzeRace(old).some((f) => f.title === "レースの流れ"));
+  assert.ok(analyzeRace(old).length > 0);
+  assert.equal(buildRaceReport(old).facts.pace, rep.facts.pace);
 });
 
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
@@ -897,22 +903,55 @@ test("自動プレイで3年進めても破綻せず、数値まで判明した�
 });
 
 /* ---------------- レース計算が意図せず変わっていないこと ---------------- */
-import { generateCpuEntries as _cpu, hash32 as _hash } from "../src/index";
+import { generateCpuEntries as _cpu, hash32 as _hash, LEGACY_RACE_V20, RACE_V21 } from "../src/index";
 
-test("レース計算の結果が基準値と完全に一致する（UI・3D の変更でレース結果が変わらない）", () => {
+import { readFileSync as _read } from "node:fs";
+
+/**
+ * 基準値を取るレース（3週分の番組）。runners を渡さなければ、今の CPU 馬の生成で出走馬を作る。
+ * 過去の計算の再現には、その当時の CPU 馬の生成で作った出走馬（fixtures/cpu-entries-v21.json）を使う
+ * （CPU 馬の能力の配分はレース計算の再設計の第4段階で変わったため）
+ */
+function pinnedRaces(cfg?: Parameters<typeof simulateOwnerRace>[3], runners?: SimRunner[][]): string {
   let acc = "";
+  let k = 0;
   for (const w of [60, 75, 90]) for (const p of raceCard(w)) {
-    const cpus = _cpu(p, 8, w * 7);
-    const sim = simulateOwnerRace(cpus.map((c, i) => ({ ...c.runner, gate: i + 1 })), { course: p.course, going: p.going }, w * 13);
+    const field = runners ? runners[k++] : _cpu(p, 8, w * 7).map((c, i) => ({ ...c.runner, gate: i + 1 }));
+    const sim = simulateOwnerRace(field, { course: p.course, going: p.going }, w * 13, cfg);
     acc += JSON.stringify(sim.results) + JSON.stringify(sim.frames[sim.frames.length - 1]);
   }
+  return acc;
+}
+
+/** v2.1 時点の CPU 馬の生成で作った出走馬（基準値を取る番組と同じ順） */
+const V21_FIELDS: SimRunner[][] = (
+  JSON.parse(_read(new URL("./fixtures/cpu-entries-v21.json", import.meta.url), "utf8")) as { runners: SimRunner[] }[]
+).map((x) => x.runners);
+
+test("レース計算の結果が UI 再設計（v2.0）前と完全に一致する（変更前の設定 LEGACY_RACE_V20 で）", () => {
+  // 着差の調整（docs/margins）で既定の計算は変わったが、変更前の設定を渡せば同じ結果を再現できること
+  const acc = pinnedRaces(withConfig({ race: LEGACY_RACE_V20 }), V21_FIELDS);
+  // v2.0 着手前（コミット a2b7516）で計算した値
+  assert.equal(_hash(acc), 2309594831);
+  assert.equal(acc.length, 13033);
+});
+
+test("レース計算の結果が着差の調整（v2.1）後の値と完全に一致する（v2.1 の設定 RACE_V21 で）", () => {
+  // レース計算の再設計（v3）で既定の計算は変わったが、v2.1 の設定を渡せば同じ結果を再現できること
+  const acc = pinnedRaces(withConfig({ race: RACE_V21 }), V21_FIELDS);
+  assert.equal(_hash(acc), 3899164333);
+  assert.equal(acc.length, 12981);
+});
+
+test("レース計算の結果が基準値と完全に一致する（UI・3D の変更でレース結果が変わらない）", () => {
+  const acc = pinnedRaces();
   // 基準値の履歴（値を変えるのは、レース計算そのものを意図して変えたときだけ）
   // ・2309594831 / 13033：v2.0 着手前（コミット a2b7516）
-  // ・レース計算の再設計 第1段階（脚質と最高速度の分離・全馬同時更新）で更新
-  // ・第2段階（ペース予測・先頭争い・単騎逃げ）で更新
-  // ・第3段階（徐々に落ちる失速・消耗要因・仕掛けの判断）で更新
-  // ・第4段階（コーナーの減速・進路判断・CPU馬の能力配分）で更新
-  // ・第5段階（全力疾走の消耗・溜めた脚・ペース指数の基準調整）で更新
-  assert.equal(_hash(acc), 3800305676);
-  assert.equal(acc.length, 13002);
+  // ・3899164333 / 12981：着差の調整（v2.1、docs/margins）
+  // ・レース計算の再設計 第1〜5段階（脚質と最高速度の分離・ペースと先頭争い・失速と仕掛け・
+  //   コーナーと進路・全力疾走の消耗）で更新
+  // ・v2.1 の着差の考え方（馬ごとの差の縮小・有酸素で賄える消耗・距離に応じた道中の運び・出遅れの縮小）を
+  //   v3 に取り込み、スタミナが有酸素の量にも効くようにして更新
+  assert.equal(_hash(acc), 1886414432);
+  assert.equal(acc.length, 12983);
 });

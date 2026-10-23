@@ -1,0 +1,614 @@
+{
+  "config": "legacy",
+  "seeds": [
+    4,
+    5,
+    6
+  ],
+  "all": [
+    {
+      "label": "全体",
+      "races": 6192,
+      "lengths12": {
+        "median": 6.94,
+        "p90": 21.64,
+        "p95": 27.67
+      },
+      "t12": {
+        "median": 1.01,
+        "p90": 3.15,
+        "p95": 4.03
+      },
+      "m12": {
+        "median": 17.46,
+        "p90": 54.27
+      },
+      "t13": {
+        "median": 1.89,
+        "p90": 4.33
+      },
+      "t1L": {
+        "median": 6.08,
+        "p90": 10.1
+      },
+      "m1L": {
+        "median": 99.72
+      },
+      "closeRate": 3.1,
+      "under1Rate": 9.4,
+      "over3Rate": 72.3,
+      "bigRate": 36.8,
+      "t00Rate": 2.3,
+      "t05Rate": 69.3,
+      "pct12": 1.307,
+      "pct13": 2.108,
+      "topAbilityWin": 27.7,
+      "rankCorr": 0.37,
+      "emptiedRate": 20.6,
+      "fadedRate": 0.4,
+      "droppedRate": 1,
+      "abilitySpread": 11.82
+    },
+    {
+      "label": "下級（新馬・未勝利）",
+      "races": 2232,
+      "lengths12": {
+        "median": 6.9,
+        "p90": 21.81,
+        "p95": 27.39
+      },
+      "t12": {
+        "median": 1,
+        "p90": 3.17,
+        "p95": 3.98
+      },
+      "m12": {
+        "median": 17,
+        "p90": 53.36
+      },
+      "t13": {
+        "median": 1.95,
+        "p90": 4.39
+      },
+      "t1L": {
+        "median": 6.21,
+        "p90": 10.19
+      },
+      "m1L": {
+        "median": 99.8
+      },
+      "closeRate": 3.6,
+      "under1Rate": 9.8,
+      "over3Rate": 71.7,
+      "bigRate": 37.8,
+      "t00Rate": 2.6,
+      "t05Rate": 68.7,
+      "pct12": 1.31,
+      "pct13": 2.138,
+      "topAbilityWin": 29.5,
+      "rankCorr": 0.39,
+      "emptiedRate": 27.2,
+      "fadedRate": 0.6,
+      "droppedRate": 1.1,
+      "abilitySpread": 12.07
+    },
+    {
+      "label": "中級（1勝・2勝）",
+      "races": 2592,
+      "lengths12": {
+        "median": 6.98,
+        "p90": 20.89,
+        "p95": 26.94
+      },
+      "t12": {
+        "median": 1.02,
+        "p90": 3.04,
+        "p95": 3.92
+      },
+      "m12": {
+        "median": 17.68,
+        "p90": 52.34
+      },
+      "t13": {
+        "median": 1.84,
+        "p90": 4.25
+      },
+      "t1L": {
+        "median": 5.98,
+        "p90": 9.82
+      },
+      "m1L": {
+        "median": 98.33
+      },
+      "closeRate": 3.1,
+      "under1Rate": 9.3,
+      "over3Rate": 72.6,
+      "bigRate": 36.1,
+      "t00Rate": 2.4,
+      "t05Rate": 69.8,
+      "pct12": 1.303,
+      "pct13": 2.094,
+      "topAbilityWin": 26.9,
+      "rankCorr": 0.35,
+      "emptiedRate": 17.8,
+      "fadedRate": 0.3,
+      "droppedRate": 1,
+      "abilitySpread": 11.25
+    },
+    {
+      "label": "上級（オープン）",
+      "races": 864,
+      "lengths12": {
+        "median": 7.27,
+        "p90": 22.19,
+        "p95": 28.15
+      },
+      "t12": {
+        "median": 1.06,
+        "p90": 3.23,
+        "p95": 4.09
+      },
+      "m12": {
+        "median": 18.97,
+        "p90": 56.37
+      },
+      "t13": {
+        "median": 1.92,
+        "p90": 4.42
+      },
+      "t1L": {
+        "median": 5.87,
+        "p90": 9.88
+      },
+      "m1L": {
+        "median": 99.53
+      },
+      "closeRate": 2.4,
+      "under1Rate": 8.6,
+      "over3Rate": 72.9,
+      "bigRate": 37.6,
+      "t00Rate": 1.9,
+      "t05Rate": 70,
+      "pct12": 1.353,
+      "pct13": 2.155,
+      "topAbilityWin": 25.6,
+      "rankCorr": 0.33,
+      "emptiedRate": 12.6,
+      "fadedRate": 0.2,
+      "droppedRate": 0.8,
+      "abilitySpread": 11.93
+    },
+    {
+      "label": "重賞",
+      "races": 504,
+      "lengths12": {
+        "median": 6.44,
+        "p90": 23.05,
+        "p95": 28.98
+      },
+      "t12": {
+        "median": 0.94,
+        "p90": 3.35,
+        "p95": 4.21
+      },
+      "m12": {
+        "median": 16.88,
+        "p90": 60.01
+      },
+      "t13": {
+        "median": 1.81,
+        "p90": 4.28
+      },
+      "t1L": {
+        "median": 6.34,
+        "p90": 11.48
+      },
+      "m1L": {
+        "median": 109.79
+      },
+      "closeRate": 2,
+      "under1Rate": 9.3,
+      "over3Rate": 71.8,
+      "bigRate": 35.1,
+      "t00Rate": 1.6,
+      "t05Rate": 67.9,
+      "pct12": 1.234,
+      "pct13": 1.966,
+      "topAbilityWin": 27.2,
+      "rankCorr": 0.39,
+      "emptiedRate": 19,
+      "fadedRate": 0,
+      "droppedRate": 0.7,
+      "abilitySpread": 13.55
+    },
+    {
+      "label": "短距離（〜1400m）",
+      "races": 2184,
+      "lengths12": {
+        "median": 5.05,
+        "p90": 15.15,
+        "p95": 18.4
+      },
+      "t12": {
+        "median": 0.73,
+        "p90": 2.2,
+        "p95": 2.68
+      },
+      "m12": {
+        "median": 12.86,
+        "p90": 38.56
+      },
+      "t13": {
+        "median": 1.44,
+        "p90": 3.12
+      },
+      "t1L": {
+        "median": 4.87,
+        "p90": 7.41
+      },
+      "m1L": {
+        "median": 80.7
+      },
+      "closeRate": 3.8,
+      "under1Rate": 12.1,
+      "over3Rate": 65.2,
+      "bigRate": 25.1,
+      "t00Rate": 2.8,
+      "t05Rate": 61.8,
+      "pct12": 1.339,
+      "pct13": 2.221,
+      "topAbilityWin": 26.2,
+      "rankCorr": 0.32,
+      "emptiedRate": 0,
+      "fadedRate": 0,
+      "droppedRate": 1.1,
+      "abilitySpread": 11.7
+    },
+    {
+      "label": "マイル（〜1800m）",
+      "races": 1737,
+      "lengths12": {
+        "median": 6.74,
+        "p90": 20.82,
+        "p95": 25.55
+      },
+      "t12": {
+        "median": 0.98,
+        "p90": 3.03,
+        "p95": 3.72
+      },
+      "m12": {
+        "median": 17.11,
+        "p90": 53.11
+      },
+      "t13": {
+        "median": 1.9,
+        "p90": 4.15
+      },
+      "t1L": {
+        "median": 5.99,
+        "p90": 8.79
+      },
+      "m1L": {
+        "median": 99.91
+      },
+      "closeRate": 2.5,
+      "under1Rate": 8.2,
+      "over3Rate": 72.4,
+      "bigRate": 36.8,
+      "t00Rate": 1.8,
+      "t05Rate": 69.1,
+      "pct12": 1.293,
+      "pct13": 2.07,
+      "topAbilityWin": 27.2,
+      "rankCorr": 0.36,
+      "emptiedRate": 4.6,
+      "fadedRate": 0.1,
+      "droppedRate": 0.8,
+      "abilitySpread": 11.83
+    },
+    {
+      "label": "中距離（〜2400m）",
+      "races": 1626,
+      "lengths12": {
+        "median": 8.83,
+        "p90": 24.94,
+        "p95": 31
+      },
+      "t12": {
+        "median": 1.28,
+        "p90": 3.63,
+        "p95": 4.51
+      },
+      "m12": {
+        "median": 22.08,
+        "p90": 62.37
+      },
+      "t13": {
+        "median": 2.29,
+        "p90": 4.81
+      },
+      "t1L": {
+        "median": 7.2,
+        "p90": 10.85
+      },
+      "m1L": {
+        "median": 117.64
+      },
+      "closeRate": 2.8,
+      "under1Rate": 7.7,
+      "over3Rate": 78.7,
+      "bigRate": 45.2,
+      "t00Rate": 2.1,
+      "t05Rate": 75.7,
+      "pct12": 1.29,
+      "pct13": 2.033,
+      "topAbilityWin": 30,
+      "rankCorr": 0.42,
+      "emptiedRate": 35.2,
+      "fadedRate": 0.8,
+      "droppedRate": 1.3,
+      "abilitySpread": 11.98
+    },
+    {
+      "label": "長距離（2500m〜）",
+      "races": 645,
+      "lengths12": {
+        "median": 11.8,
+        "p90": 33.87,
+        "p95": 42.34
+      },
+      "t12": {
+        "median": 1.72,
+        "p90": 4.93,
+        "p95": 6.16
+      },
+      "m12": {
+        "median": 28.31,
+        "p90": 80.33
+      },
+      "t13": {
+        "median": 3.07,
+        "p90": 6.57
+      },
+      "t1L": {
+        "median": 9.66,
+        "p90": 14.73
+      },
+      "m1L": {
+        "median": 150.22
+      },
+      "closeRate": 3.3,
+      "under1Rate": 7.3,
+      "over3Rate": 79.8,
+      "bigRate": 55.5,
+      "t00Rate": 2.6,
+      "t05Rate": 78.6,
+      "pct12": 1.279,
+      "pct13": 2.014,
+      "topAbilityWin": 28.5,
+      "rankCorr": 0.4,
+      "emptiedRate": 96.4,
+      "fadedRate": 1.4,
+      "droppedRate": 0.4,
+      "abilitySpread": 11.83
+    },
+    {
+      "label": "良馬場",
+      "races": 3915,
+      "lengths12": {
+        "median": 6.72,
+        "p90": 20.88,
+        "p95": 26.7
+      },
+      "t12": {
+        "median": 0.98,
+        "p90": 3.04,
+        "p95": 3.88
+      },
+      "m12": {
+        "median": 16.99,
+        "p90": 52.41
+      },
+      "t13": {
+        "median": 1.82,
+        "p90": 4.19
+      },
+      "t1L": {
+        "median": 5.9,
+        "p90": 9.82
+      },
+      "m1L": {
+        "median": 97.73
+      },
+      "closeRate": 3.1,
+      "under1Rate": 9.6,
+      "over3Rate": 71.9,
+      "bigRate": 35.6,
+      "t00Rate": 2.4,
+      "t05Rate": 68.8,
+      "pct12": 1.291,
+      "pct13": 2.079,
+      "topAbilityWin": 27.3,
+      "rankCorr": 0.35,
+      "emptiedRate": 18.6,
+      "fadedRate": 0.3,
+      "droppedRate": 1,
+      "abilitySpread": 11.81
+    },
+    {
+      "label": "道悪",
+      "races": 2277,
+      "lengths12": {
+        "median": 7.34,
+        "p90": 22.92,
+        "p95": 28.66
+      },
+      "t12": {
+        "median": 1.07,
+        "p90": 3.33,
+        "p95": 4.17
+      },
+      "m12": {
+        "median": 18.43,
+        "p90": 55.82
+      },
+      "t13": {
+        "median": 2.01,
+        "p90": 4.49
+      },
+      "t1L": {
+        "median": 6.35,
+        "p90": 10.53
+      },
+      "m1L": {
+        "median": 103.08
+      },
+      "closeRate": 3,
+      "under1Rate": 9,
+      "over3Rate": 72.9,
+      "bigRate": 39,
+      "t00Rate": 2.2,
+      "t05Rate": 70.1,
+      "pct12": 1.335,
+      "pct13": 2.156,
+      "topAbilityWin": 28.3,
+      "rankCorr": 0.39,
+      "emptiedRate": 24.1,
+      "fadedRate": 0.5,
+      "droppedRate": 1,
+      "abilitySpread": 11.84
+    }
+  ],
+  "perSet": [
+    {
+      "label": "シード組4",
+      "races": 2064,
+      "lengths12": {
+        "median": 7.24,
+        "p90": 21.59,
+        "p95": 27.01
+      },
+      "t12": {
+        "median": 1.05,
+        "p90": 3.14,
+        "p95": 3.93
+      },
+      "m12": {
+        "median": 18.18,
+        "p90": 53.76
+      },
+      "t13": {
+        "median": 1.9,
+        "p90": 4.28
+      },
+      "t1L": {
+        "median": 6.11,
+        "p90": 10.07
+      },
+      "m1L": {
+        "median": 100.18
+      },
+      "closeRate": 3.1,
+      "under1Rate": 9.1,
+      "over3Rate": 71.9,
+      "bigRate": 37.2,
+      "t00Rate": 2.5,
+      "t05Rate": 68.6,
+      "pct12": 1.31,
+      "pct13": 2.124,
+      "topAbilityWin": 28.2,
+      "rankCorr": 0.37,
+      "emptiedRate": 20.8,
+      "fadedRate": 0.4,
+      "droppedRate": 1.1,
+      "abilitySpread": 11.83
+    },
+    {
+      "label": "シード組5",
+      "races": 2064,
+      "lengths12": {
+        "median": 6.85,
+        "p90": 22.17,
+        "p95": 27.71
+      },
+      "t12": {
+        "median": 1,
+        "p90": 3.22,
+        "p95": 4.03
+      },
+      "m12": {
+        "median": 17.18,
+        "p90": 54.99
+      },
+      "t13": {
+        "median": 1.86,
+        "p90": 4.29
+      },
+      "t1L": {
+        "median": 6.11,
+        "p90": 10.08
+      },
+      "m1L": {
+        "median": 100.14
+      },
+      "closeRate": 3.2,
+      "under1Rate": 8.9,
+      "over3Rate": 72.3,
+      "bigRate": 37.3,
+      "t00Rate": 2.1,
+      "t05Rate": 69.1,
+      "pct12": 1.313,
+      "pct13": 2.086,
+      "topAbilityWin": 27.2,
+      "rankCorr": 0.36,
+      "emptiedRate": 20.5,
+      "fadedRate": 0.3,
+      "droppedRate": 0.9,
+      "abilitySpread": 11.82
+    },
+    {
+      "label": "シード組6",
+      "races": 2064,
+      "lengths12": {
+        "median": 6.83,
+        "p90": 21.12,
+        "p95": 28.23
+      },
+      "t12": {
+        "median": 0.99,
+        "p90": 3.07,
+        "p95": 4.11
+      },
+      "m12": {
+        "median": 17.17,
+        "p90": 52.23
+      },
+      "t13": {
+        "median": 1.91,
+        "p90": 4.43
+      },
+      "t1L": {
+        "median": 6.03,
+        "p90": 10.13
+      },
+      "m1L": {
+        "median": 98.73
+      },
+      "closeRate": 2.9,
+      "under1Rate": 10.1,
+      "over3Rate": 72.7,
+      "bigRate": 36.1,
+      "t00Rate": 2.4,
+      "t05Rate": 70.1,
+      "pct12": 1.298,
+      "pct13": 2.113,
+      "topAbilityWin": 27.7,
+      "rankCorr": 0.37,
+      "emptiedRate": 20.4,
+      "fadedRate": 0.4,
+      "droppedRate": 0.9,
+      "abilitySpread": 11.82
+    }
+  ]
+}
