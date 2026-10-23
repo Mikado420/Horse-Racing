@@ -1,6 +1,8 @@
 // 馬主モードのレースシミュレーション（指示書 13・14章）。
 // ・10Hz の離散時間計算。描画は記録したフレームを補間して行う
-// ・目標速度へは加速力に応じて徐々に近づく。スタミナ（エネルギー）は速度の2乗に比例して減る
+// ・目標速度へは加速力に応じて徐々に近づく。スタミナ（エネルギー）は「速度の3乗に比例する消費 − 有酸素で賄える分」だけ減る
+// ・道中は距離に応じたペースで運び、残りのエネルギーで走り切れる速度に配分する。前の馬が近ければ馬群について行く
+//   （計算式と係数の根拠は docs/margins/README.md）
 // ・コーナーの外を回る距離ロス、前が詰まる不利、進路を外へ出す移動時間を簡易に表現
 // ・騎手AIはルールベース。参照するのは自馬の能力・作戦・周りの馬の位置・残り距離・残りスタミナだけ
 // ・着順はシミュレーション上のゴール通過時刻（補間）で決める。同じ入力と乱数シードなら同じ結果
@@ -101,12 +103,15 @@ const PACE_ADJ: Record<PacePlan, number> = { easy: -0.012, normal: 0, aggressive
 export const HORSE_LENGTH = 2.4;
 /** エネルギー消費の基準速度（m/秒）。この速度で1mあたり1を消費する */
 const COST_REF = 17.5;
+/** differenceScale で能力値の差を縮めるときの中心の値 */
+const ABILITY_REF = 60;
 
 interface St {
   r: SimRunner;
   top: number;
   accel: number;
   energy: number;
+  energy0: number;
   costMul: number;
   rs: number; // 実効の賢さ
   fs: number;
@@ -146,34 +151,41 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig): 
   const over = D > apt.distanceMax;
   const de = cfg.distanceEffect;
 
-  const surfaceMul = fitMultiplier(c.surface === "turf" ? apt.turf : apt.dirt, 0.06);
-  const goingMul = 1 - g * 0.01 * (1 - a.power / 130) - (g > 0 ? 0.035 * (1 - apt.heavy / 100) * (g / 3) : 0);
+  const rc = cfg.race;
+  // 馬ごとの差を生む要素（速度・エネルギーに換算する能力値・芝ダート/回り/小回り/脚質の適性・状態・その日の出来）を、
+  // differenceScale 倍に縮める（1 ならそのまま）。馬場全体の重さと距離適性の補正はここでは縮めない
+  const k = rc.differenceScale;
+  const sc = (m: number) => (k === 1 ? m : 1 + k * (m - 1));
+  const pts = (x: number) => (k === 1 ? x : ABILITY_REF + k * (x - ABILITY_REF));
+  const surfaceMul = fitMultiplier(c.surface === "turf" ? apt.turf : apt.dirt, rc.surfaceFit);
+  const goingMul = 1 - g * 0.01 * (1 - pts(a.power) / 130) - (g > 0 ? 0.035 * (1 - apt.heavy / 100) * (g / 3) : 0);
   const dirMul = fitMultiplier(c.direction === "right" ? apt.right : apt.left, 0.02);
   const tightMul = c.tight ? fitMultiplier(apt.tight, 0.02) : 1;
   const styleMul = fitMultiplier(apt.styles[r.tactics.style], 0.025);
-  const condMul = (1 + 0.012 * r.condition) * (1 - 0.0008 * r.fatigue) * (0.95 + 0.05 * (r.fitness / 100));
+  const condMul =
+    (1 + rc.conditionPerLevel * r.condition) * (1 - rc.fatiguePerPoint * r.fatigue) * (1 - rc.fitnessWeight + rc.fitnessWeight * (r.fitness / 100));
   const rs = Math.min(100, a.raceSense + Math.min(r.experience, 12) * 0.5);
-  const formSd = 0.009 * (has(r, "inconsistent") ? 2.4 : 1) * (1.2 - rs / 200);
+  const formSd = rc.formSd * (has(r, "inconsistent") ? 2.4 : 1) * (1.2 - rs / 200);
   const form = 1 + gaussian(rng) * formSd;
   const distSpeed = under ? 1 - de.shortSpeed * (1 - distF) : over ? 1 - de.longSpeed * (1 - distF) : 1;
-  const speedMul = surfaceMul * goingMul * dirMul * tightMul * styleMul * condMul * form * distSpeed;
-
-  const top = (16.6 + 0.034 * a.speed) * speedMul;
-  const accel = (1.5 + 0.022 * a.acceleration) * (0.85 + 0.15 * (a.power / 100)) * (under ? 1 - de.shortAccel * (1 - distF) : 1);
-  const energy = (700 + 27 * a.stamina) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100));
+  const speedMul = sc(surfaceMul) * goingMul * sc(dirMul) * sc(tightMul) * sc(styleMul) * sc(condMul) * sc(form) * distSpeed;
+  const top = (rc.topBase + rc.topPerSpeed * pts(a.speed)) * speedMul;
+  const accel = (1.5 + 0.022 * pts(a.acceleration)) * (0.85 + 0.15 * (pts(a.power) / 100)) * (under ? 1 - de.shortAccel * (1 - distF) : 1);
+  const energy = cfg.race.energyScale * (700 + 27 * pts(a.stamina)) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100));
   const costMul =
     (over ? 1 + de.longStamina * (1 - distF) : 1) *
     (1.05 - 0.07 * (rs / 100)) *
     (has(r, "calm") ? 0.97 : 1) *
-    (2 - styleMul * 1) *
+    (2 - sc(styleMul) * 1) *
     (1 + 0.04 * g);
-  const startDelay = rng() * 0.45 * (1.25 - rs / 140);
+  const startDelay = rng() * 0.45 * (1.25 - rs / 140) * rc.startDelayScale;
 
   return {
     r,
     top,
     accel,
     energy,
+    energy0: energy,
     costMul,
     rs,
     fs: a.fightingSpirit,
@@ -213,6 +225,31 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig): 
       startDelay: Math.round(startDelay * 100) / 100,
     },
   };
+}
+
+/** 速度 v で残り remain(m) を走るのに要るエネルギー（有酸素で賄える分を差し引き、消費の倍率をかける） */
+function energyNeed(st: St, v: number, remain: number, cfg: GameConfig): number {
+  return remain * st.costMul * (Math.pow(v / COST_REF, 2) - cfg.race.aerobicRate / v);
+}
+
+/**
+ * 道中の配分：仕掛け地点から先を最高速度で走る分のエネルギーを残したうえで、
+ * 仕掛け地点まで一定速度で走れる上限の速度（二分法）
+ */
+function sustainableSpeed(st: St, remain: number, spurtFrom: number, cfg: GameConfig): number {
+  const spurtLen = Math.min(remain, spurtFrom);
+  const before = remain - spurtLen;
+  if (before <= 0) return st.top * 1.2;
+  const energy = st.energy - Math.max(0, energyNeed(st, st.top, spurtLen, cfg));
+  let lo = 5;
+  let hi = st.top * 1.2;
+  if (energyNeed(st, hi, before, cfg) <= energy) return hi;
+  for (let k = 0; k < 18; k++) {
+    const mid = (lo + hi) / 2;
+    if (energyNeed(st, mid, before, cfg) <= energy) lo = mid;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /** 作戦から決まる仕掛け地点（ゴールまでの残り距離） */
@@ -275,7 +312,7 @@ export function simulateOwnerRace(
         if (st.phase === "early" && st.d >= earlyEnd) st.phase = "mid";
         if (st.phase !== "spurt" && remain <= spurtFrom[i]) {
           // 残りのエネルギーで最後まで脚が持つか見極めてから仕掛ける
-          const need = remain * st.costMul * Math.pow(st.top / COST_REF, 2);
+          const need = energyNeed(st, st.top, remain, cfg);
           if (st.energy >= need * 0.92 || remain <= 260) {
             st.phase = "spurt";
             st.tel.spurtRemain = Math.round(remain);
@@ -287,16 +324,22 @@ export function simulateOwnerRace(
       let blockedBy: St | null = null;
       let crowd = 0;
       let rival = false;
+      let duelClose = 0;
+      let ahead: St | null = null;
       for (let j = 0; j < n; j++) {
         if (j === i) continue;
         const o = S[j];
         const gap = o.d - st.d;
         const dl = Math.abs(o.lane - st.lane);
         if (Math.abs(gap) < 3 && dl < 2.2) crowd++;
+        if (gap > 0 && gap < cfg.race.followRange && o.finish === null && (!ahead || o.d < ahead.d)) ahead = o;
         if (gap > 0 && gap < 2.6 && dl < 1.25 && o.finish === null) {
           if (!blockedBy || o.d < blockedBy.d) blockedBy = o;
         }
-        if (!done && remain < 300 && o.finish === null && Math.abs(gap) < 1.6 && dl < 2.6) rival = true;
+        if (!done && remain < 300 && o.finish === null && Math.abs(gap) < 1.6 && dl < 2.6) {
+          rival = true;
+          duelClose = Math.max(duelClose, 1 - Math.abs(gap) / 1.6);
+        }
       }
 
       // 目標速度
@@ -307,6 +350,8 @@ export function simulateOwnerRace(
       } else {
         let frac = st.phase === "early" ? EARLY_FRACTION[r.tactics.style] : MID_FRACTION;
         frac += PACE_ADJ[r.tactics.pace];
+        // 距離に応じた道中のペース：長い距離ほどゆったり、短い距離ほど速く運ぶ（cruisePerKm が 0 なら距離によらない）
+        if (cfg.race.cruisePerKm !== 0) frac = Math.min(0.99, frac * (1 - cfg.race.cruisePerKm * ((D - 1600) / 1000)));
         let desired = DESIRED_POS[r.tactics.style];
         if (has(r, "frontObsessed")) {
           desired = 0;
@@ -324,11 +369,28 @@ export function simulateOwnerRace(
           const chance = has(r, "keen") ? 0.35 * (1.2 - st.rs / 120) : 0.01 * (1 - st.rs / 100);
           st.keenNow = r.tactics.style !== "front" && rng() < chance;
         }
+        // 道中の速度：作戦（脚質・ペース・位置取り）による割合を、巡航の基準速度にかける。
+        // 基準は最高速度の MID_FRACTION 倍だが、配分（staminaPacing）が有効なら、残りのエネルギーで
+        // 最後まで走り切れる速度を超えないように抑える（長い距離ほど道中は遅くなる）
+        let own = st.top * frac;
+        let sustainable = Infinity;
+        if (cfg.race.staminaPacing > 0 && st.energy > 0) {
+          sustainable = sustainableSpeed(st, remain, spurtFrom[i], cfg);
+          const cruise = Math.min(st.top * MID_FRACTION, Math.max(st.top * 0.8, sustainable * cfg.race.staminaPacing));
+          own = cruise * (frac / MID_FRACTION);
+        }
+        // 行きたがる：騎手が抑えても前に行こうとして消耗する
         if (st.keenNow) {
-          frac += 0.02;
+          own += st.top * 0.02;
           st.tel.keenSec += dt;
         }
-        target = st.top * frac;
+        target = own;
+        // 馬群について行く：すぐ前の馬が速ければ、その速度に合わせる（離されないように脚を使う）。
+        // ただし最高速度の followMaxFraction 倍と、走り切れる速度の followOverPace 倍までしか無理をしない
+        if (ahead && cfg.race.followMaxFraction > 0) {
+          const limit = Math.min(st.top * cfg.race.followMaxFraction, sustainable * cfg.race.followOverPace);
+          target = Math.max(target, Math.min(ahead.v, limit));
+        }
       }
 
       if (!done) {
@@ -338,7 +400,9 @@ export function simulateOwnerRace(
         }
         // 競り合い：根性で伸びる
         if (rival) {
-          target *= 1 + 0.00025 * st.fs + (has(r, "gutsy") ? 0.006 : 0);
+          // duelTaper > 0 なら、並んでいるほど強く効く（離れるにつれて連続的に弱まる）
+          const strength = 1 - cfg.race.duelTaper * (1 - duelClose);
+          target *= 1 + (0.00025 * st.fs + (has(r, "gutsy") ? 0.006 : 0)) * strength;
           st.duelTicks++;
           if (st.rankAtDuel === null) st.rankAtDuel = rankOf[i];
         }
@@ -348,9 +412,16 @@ export function simulateOwnerRace(
           if (has(r, "hatesCrowd")) target *= 0.985;
         }
         // スタミナ切れ
+        // 尽きたときに保てる速度は根性で少し上がる。fadeReserve > 0 なら、残りが少なくなった所から
+        // その速度へ向けて連続的に落ちていく（尽きた瞬間に急に止まるような不連続をなくす）
+        const floor = cfg.race.emptyFloor + 0.0006 * st.fs + (has(r, "gutsy") ? 0.008 : 0);
+        const reserve = cfg.race.fadeReserve * st.energy0;
         if (st.energy <= 0) {
           if (st.tel.emptyRemain === null) st.tel.emptyRemain = Math.round(remain);
-          target = Math.min(target, st.top * (0.89 + 0.0006 * st.fs + (has(r, "gutsy") ? 0.008 : 0)));
+          target = Math.min(target, st.top * floor);
+        } else if (st.energy < reserve) {
+          const left = st.energy / reserve;
+          target = Math.min(target, st.top * (floor + (1 - floor) * left));
         }
         // 前が詰まる（前の馬より速く走りたいのに抜けない）
         st.wantOut = false;
@@ -394,7 +465,7 @@ export function simulateOwnerRace(
 
       if (!done) {
         const cost = st.costMul * Math.pow(st.v / COST_REF, 2) * (st.keenNow ? 1.2 : 1) * (crowd >= 2 && has(r, "hatesCrowd") ? 1.05 : 1);
-        st.energy -= cost * st.v * dt;
+        st.energy = Math.min(st.energy0, st.energy - (cost * st.v - cfg.race.aerobicRate * st.costMul) * dt);
         if (st.phase !== "spurt" && st.d > 200) {
           st.cruiseSum += st.v;
           st.cruiseN++;

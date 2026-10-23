@@ -43,6 +43,13 @@ export function SettingsPanel({ onSwitchMode }: { onSwitchMode: () => void }) {
       )}
       {seg("3D描画", s.quality, [["high", "高品質"], ["low", "軽量"]], (v) => setSettings({ quality: v }), "動きが重いときは軽量にしてください")}
       {seg("レースの再生速度", s.replaySpeed, [[1, "等速"], [2, "2倍"], [4, "4倍"]], (v) => setSettings({ replaySpeed: v }))}
+      {seg(
+        "開発者向け機能",
+        s.devTools,
+        [[false, "表示しない"], [true, "表示する"]],
+        (v) => setSettings({ devTools: v }),
+        "バランス調整用の「検証」（仮の馬を何百回も走らせる）を記録・分析に表示します。ゲームの進行には影響しません",
+      )}
 
       <AppSection />
 

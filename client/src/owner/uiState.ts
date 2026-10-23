@@ -10,6 +10,8 @@ export interface UiSettings {
   quality: "high" | "low";
   /** レースの再生速度 */
   replaySpeed: 1 | 2 | 4;
+  /** 開発者向け機能（バランス調整用の検証）を表示する。通常のプレイでは使わない */
+  devTools: boolean;
 }
 
 export interface UiState {
@@ -22,7 +24,7 @@ export interface UiState {
 
 const KEY = "owners.ui.v2";
 const DEFAULT: UiState = {
-  settings: { effects: "standard", sound: false, quality: "high", replaySpeed: 2 },
+  settings: { effects: "standard", sound: false, quality: "high", replaySpeed: 2, devTools: false },
   readReports: {},
   opinions: {},
 };
