@@ -101,6 +101,53 @@ export interface SimTuning {
   /** ペースの表示：平均の指数がこの値以上でハイ、マイナスこの値以下でスロー */
   paceLabelAt: number;
 
+  /* ---------- スタミナと仕掛け（第3段階） ---------- */
+  /** 残りエネルギーの割合がこれを下回ると速度を保てなくなり始める */
+  fadeStart: number;
+  /** 余力が尽きても保てる速度（最高速度に対する割合）と、根性・勝負根性による上乗せ */
+  fadeFloor: number;
+  fadeGrit: number;
+  gutsyGrit: number;
+  /** 余力が減るにつれて速度が落ちる曲線（1 で直線、小さいほど終わり際に急） と根性による粘り */
+  fadeCurve: number;
+  fadeResist: number;
+  /** 保てる速度が最高速度のこの割合を下回ったら「失速が始まった」と記録する */
+  fadeMark: number;
+  /** 失速するときの減速の速さ（m/秒²） */
+  fadeDecel: number;
+  /** 前の馬の後ろで楽に走れる量（消耗の削減率）、効く距離（m：この間で弱まる）、横の幅（m） */
+  draftSave: number;
+  draftRange: [number, number];
+  draftLane: number;
+  /** 加速 1 m/秒 あたりの消耗と、横へ 1m 動くときの消耗 */
+  accelCost: number;
+  lateralCost: number;
+  /** コーナー・坂での消耗の増加（パワーで軽くなる） */
+  cornerCost: number;
+  slopeCost: number;
+  /** 仕掛けの目安への加算：脚質（m）、距離 1m あたり（上限あり）、加速力 1 あたり */
+  spurtStyleAdj: Record<RunningStyle, number>;
+  spurtPerMeter: number;
+  spurtDistCap: number;
+  spurtPerAccel: number;
+  /** 仕掛け位置のずれ（m）と、残りの脚の見積もりのずれ（割合）。賢さが高いほど小さい */
+  spurtExecSd: number;
+  spurtJudgeSd: number;
+  /** 目標位置より後ろにいるとき、順位割合 1 あたり何m早く動くか */
+  spurtLagMeters: number;
+  /** 手応えに余裕があるとき、目安より何m早く動けるか、その余裕の基準（必要量の倍率） */
+  spurtSurplusLead: number;
+  spurtSurplus: number;
+  /** 仕掛けに必要とみなす余力の割合、温存しておく余力（fadeStart に対する割合）、必ず仕掛ける地点（m） */
+  spurtNeed: number;
+  spurtKeep: number;
+  spurtForce: number;
+
+  /* ---------- その日の出来 ---------- */
+  /** 出来のぶれ（最高速度に対する標準偏差）と、スタミナへの効き（最高速度へのぶれの倍率） */
+  formSd: number;
+  formEnergy: number;
+
   /* ---------- エネルギー ---------- */
   /** この速度で1mあたり1を消費する（m/秒） */
   costRef: number;
@@ -164,6 +211,37 @@ export const DEFAULT_SIM_TUNING: SimTuning = {
   paceSlowPush: 0.5,
   slowBandShift: 0.15,
   paceLabelAt: 0.3,
+
+  fadeStart: 0.18,
+  fadeFloor: 0.86,
+  fadeGrit: 0.05,
+  gutsyGrit: 0.012,
+  fadeCurve: 0.7,
+  fadeResist: 0.4,
+  fadeMark: 0.97,
+  fadeDecel: 0.5,
+  draftSave: 0.07,
+  draftRange: [3, 7],
+  draftLane: 1.1,
+  accelCost: 5,
+  lateralCost: 2,
+  cornerCost: 0.03,
+  slopeCost: 0.25,
+  spurtStyleAdj: { front: -20, stalker: 0, closer: 30, deep: 50 },
+  spurtPerMeter: 0.04,
+  spurtDistCap: 60,
+  spurtPerAccel: 1.5,
+  spurtExecSd: 40,
+  spurtJudgeSd: 0.12,
+  spurtLagMeters: 250,
+  spurtSurplusLead: 120,
+  spurtSurplus: 1.3,
+  spurtNeed: 0.92,
+  spurtKeep: 0.5,
+  spurtForce: 260,
+
+  formSd: 0.011,
+  formEnergy: 1.5,
 
   costRef: 17.5,
   costEconomy: 1.0,

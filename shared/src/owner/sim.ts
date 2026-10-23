@@ -75,6 +75,8 @@ export interface RunnerTelemetry {
   startDelay: number;
   /** 先頭争いをしていた時間（秒）。再設計前の記録にはない */
   leadBattleSec?: number;
+  /** 余力が減って速度を保てなくなり始めた地点（ゴールまでの残り距離）。再設計前の記録にはない */
+  fadeRemain?: number | null;
   /** positions と同じ地点での残りエネルギーの割合（0〜1）。再設計前の記録にはない */
   reserve?: number[];
 }
@@ -156,6 +158,10 @@ interface St {
   rankAtDuel: number | null;
   /** 先頭争いから引いた（2番手以下で控えると決めた） */
   conceded: boolean;
+  /** 作戦・脚質・距離・加速力・騎手の判断のずれから決まる仕掛けの目安（ゴールまでの残り距離） */
+  spurtBase: number;
+  /** 残りの脚の見積もりのずれ（賢さが低いほど大きい） */
+  judgeErr: number;
 }
 
 function has(r: SimRunner, t: TraitId) {
@@ -205,12 +211,13 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
   const T = cfg.race.tuning;
 
   const rs = Math.min(100, a.raceSense + Math.min(r.experience, 12) * 0.5);
-  const formSd = 0.009 * (has(r, "inconsistent") ? 2.4 : 1) * (1.2 - rs / 200);
+  // その日の出来（最高速度とスタミナの両方に出る）
+  const formSd = T.formSd * (has(r, "inconsistent") ? 2.4 : 1) * (1.2 - rs / 200);
   const form = 1 + gaussian(rng) * formSd;
   const styleFit = clamp(apt.styles[r.tactics.style] / 100, 0, 1);
   const top = baseTopSpeed(r, cond, cfg) * form;
   const accel = (1.5 + 0.022 * a.acceleration) * (0.85 + 0.15 * (a.power / 100)) * (under ? 1 - de.shortAccel * (1 - distF) : 1);
-  const energy = (700 + 27 * a.stamina) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100));
+  const energy = (700 + 27 * a.stamina) * (1 - 0.003 * r.fatigue) * (0.9 + 0.1 * (r.fitness / 100)) * (1 + (form - 1) * T.formEnergy);
   const costMul =
     (over ? 1 + de.longStamina * (1 - distF) : 1) *
     (1.05 - 0.07 * (rs / 100)) *
@@ -218,6 +225,17 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
     (1 + T.styleWaste * (1 - styleFit)) *
     (1 + 0.04 * g);
   const startDelay = rng() * 0.45 * (1.25 - rs / 140);
+  // 仕掛けの目安：作戦の基準に、脚質（後ろの馬ほど早めに動く）・距離・加速力（鈍いほど早め）を加え、
+  // 作戦遂行の精度（賢さと脚質適性）に応じたずれを乗せる
+  const style: RunningStyle = has(r, "frontObsessed") ? "front" : r.tactics.style;
+  const exec = T.spurtExecSd * (1.3 - 0.5 * styleFit - rs / 200);
+  const spurtBase =
+    spurtPoint(cond.course, r.tactics.spurt) +
+    T.spurtStyleAdj[style] +
+    clamp((D - 1600) * T.spurtPerMeter, -T.spurtDistCap, T.spurtDistCap) +
+    (60 - a.acceleration) * T.spurtPerAccel +
+    gaussian(rng) * exec;
+  const judgeErr = gaussian(rng) * T.spurtJudgeSd * (1 - rs / 100);
 
   return {
     r,
@@ -249,6 +267,8 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
     duelTicks: 0,
     rankAtDuel: null,
     conceded: false,
+    spurtBase,
+    judgeErr,
     tel: {
       id: r.id,
       splits: [],
@@ -267,6 +287,7 @@ function prepare(r: SimRunner, cond: SimConditions, rng: Rng, cfg: GameConfig, l
       styleShown: r.tactics.style,
       startDelay: Math.round(startDelay * 100) / 100,
       leadBattleSec: 0,
+      fadeRemain: null,
     },
   };
 }
@@ -355,7 +376,7 @@ export function simulateOwnerRace(
   const S: St[] = sorted.map((r) => prepare(r, cond, rng, cfg, laneGap));
   const checkpoints = [D - 400, 800, 400, 200, 0].filter((x, i, arr) => x >= 0 && arr.indexOf(x) === i && x < D);
   const cpLabels = new Map<number, string>([[D - 400, "序盤"], [800, "残り800m"], [400, "残り400m"], [200, "残り200m"], [0, "ゴール"]]);
-  const spurtFrom = S.map((st) => spurtPoint(c, st.r.tactics.spurt));
+  const spurtFrom = S.map((st) => st.spurtBase);
   const earlyEnd = Math.min(T.earlyMeters, D * T.earlyFraction);
   const paceK = 1 - Math.exp(-dt / T.paceTau);
 
@@ -461,12 +482,23 @@ export function simulateOwnerRace(
       // 段階の切り替え
       if (!done) {
         if (st.phase === "early" && d0[i] >= earlyEnd) st.phase = "mid";
-        if (st.phase !== "spurt" && remain <= spurtFrom[i]) {
-          // 残りのエネルギーで最後まで脚が持つか見極めてから仕掛ける
-          const need = remain * st.costMul * Math.pow(st.top / T.costRef, 2);
-          if (st.energy >= need * 0.92 || remain <= 260) {
-            st.phase = "spurt";
-            st.tel.spurtRemain = Math.round(remain);
+        if (st.phase !== "spurt") {
+          // 目標位置より後ろにいるほど早めに動く
+          const lag = Math.max(0, softPos[i] - bands[i][1]);
+          const point = spurtFrom[i] + lag * T.spurtLagMeters;
+          if (remain <= point + T.spurtSurplusLead) {
+            // 残りのエネルギーで最後まで脚が持つか見極めてから仕掛ける（見積もりは騎手の判断でずれる）
+            const effort = Math.pow(TOP_REF / st.top, T.costEconomy);
+            const need = remain * st.costMul * effort * Math.pow(st.top / T.costRef, 2) * (1 + st.judgeErr);
+            const spare = st.energy - T.fadeStart * st.energy0 * T.spurtKeep;
+            const go =
+              remain <= T.spurtForce ||
+              (remain <= point && spare >= need * T.spurtNeed) ||
+              spare >= need * T.spurtSurplus; // 手応えに余裕があれば少し早めに動く
+            if (go) {
+              st.phase = "spurt";
+              st.tel.spurtRemain = Math.round(remain);
+            }
           }
         }
       }
@@ -475,10 +507,13 @@ export function simulateOwnerRace(
       let blockedBy = -1;
       let crowd = 0;
       let rival = false;
+      let draft = 0;
       for (let j = 0; j < n; j++) {
         if (j === i) continue;
         const gap = d0[j] - d0[i];
         const dl = Math.abs(l0[j] - l0[i]);
+        // 前の馬の真後ろで流れに乗っていると楽に走れる
+        if (gap > 0.5 && gap < T.draftRange[1] && dl < T.draftLane && !done0[j]) draft = Math.max(draft, 1 - smoothstep(T.draftRange[0], T.draftRange[1], gap));
         if (Math.abs(gap) < 3 && dl < 2.2) crowd++;
         if (gap > 0 && gap < 2.6 && dl < 1.25 && !done0[j]) {
           if (blockedBy < 0 || d0[j] < d0[blockedBy]) blockedBy = j;
@@ -582,10 +617,18 @@ export function simulateOwnerRace(
           st.tel.crowdedSec += dt;
           if (has(r, "hatesCrowd")) target *= 0.985;
         }
-        // スタミナ切れ
-        if (st.energy <= 0) {
-          if (st.tel.emptyRemain === null) st.tel.emptyRemain = Math.round(remain);
-          target = Math.min(target, st.top * (0.89 + 0.0006 * st.fs + (has(r, "gutsy") ? 0.008 : 0)));
+        // 余力の減少：残りが少なくなるほど速度を保てなくなる（急にではなく徐々に）。根性が粘りを支える
+        const res = st.energy / st.energy0;
+        if (res <= 0 && st.tel.emptyRemain === null) st.tel.emptyRemain = Math.round(remain);
+        if (res < T.fadeStart) {
+          const grit = st.fs / 100;
+          const floor = T.fadeFloor + T.fadeGrit * grit + (has(r, "gutsy") ? T.gutsyGrit : 0);
+          const u = clamp((res / T.fadeStart) * (1 + T.fadeResist * grit), 0, 1);
+          const cap = st.top * (floor + (1 - floor) * Math.pow(u, T.fadeCurve));
+          if (cap < target) {
+            if (st.tel.fadeRemain === null && cap < st.top * T.fadeMark) st.tel.fadeRemain = Math.round(remain);
+            target = cap;
+          }
         }
         // 前が詰まる（前の馬より速く走りたいのに抜けない）
         st.wantOut = false;
@@ -617,7 +660,7 @@ export function simulateOwnerRace(
       let v = v0[i];
       const boost = (v < 10 ? 1.6 : 1) * (st.phase === "spurt" && has(r, "closerKick") ? 1.15 : 1);
       if (v < target) v = Math.min(target, v + st.accel * dt * boost);
-      else v = Math.max(target, v - (st.energy <= 0 ? 0.5 : 1.1) * dt);
+      else v = Math.max(target, v - (st.energy < st.energy0 * T.fadeStart ? T.fadeDecel : 1.1) * dt);
 
       // コーナーでは外を回るほど進まない
       let progress = v * dt;
@@ -631,8 +674,22 @@ export function simulateOwnerRace(
       if (!done) {
         // 最高速度が高い馬ほど同じ速度を楽に走れる
         const effort = Math.pow(TOP_REF / st.top, T.costEconomy);
-        const cost = st.costMul * effort * Math.pow(v / T.costRef, 2) * (st.keenNow ? 1.2 : 1) * (crowd >= 2 && has(r, "hatesCrowd") ? 1.05 : 1) * (contending[i] && contest >= 2 ? 1 + T.battleCost * battle : 1);
-        st.energy -= cost * v * dt;
+        const pw = r.abilities.power / 100;
+        const corner = isCorner(c, d0[i]) ? 1 + T.cornerCost * (1 - 0.6 * pw) : 1;
+        const slope =
+          c.slope && remain <= SLOPE_REMAIN[0] && remain >= SLOPE_REMAIN[1] ? 1 + T.slopeCost * (1 - 0.6 * pw) * (1 - 0.5 * (r.aptitude.slope / 100)) : 1;
+        const cost =
+          st.costMul *
+          effort *
+          Math.pow(v / T.costRef, 2) *
+          (st.keenNow ? 1.2 : 1) *
+          (crowd >= 2 && has(r, "hatesCrowd") ? 1.05 : 1) *
+          (contending[i] && contest >= 2 ? 1 + T.battleCost * battle : 1) *
+          (1 - T.draftSave * draft) *
+          corner *
+          slope;
+        // 走る距離のぶん＋加速（緩急の繰り返し）＋横への進路変更
+        st.energy -= cost * v * dt + T.accelCost * Math.max(0, v - v0[i]) * (st.phase === "spurt" ? 0.5 : 1) + T.lateralCost * Math.abs(lane - l0[i]);
         if (st.phase !== "spurt" && d0[i] > 200) {
           st.cruiseSum += v;
           st.cruiseN++;

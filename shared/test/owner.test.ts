@@ -394,7 +394,11 @@ test("着順はゴール通過時刻で決まり、全頭がゴールする（�
 test("能力差が勝率・平均着順に反映される（数百回の自動実行）", () => {
   const p = turfProgram(1600);
   const base = runner("x", 1).aptitude;
-  const stats = [45, 55, 65, 75].map((lvl) =>
+  // 能力を一様にした仮の馬を、未勝利クラスの CPU 馬（能力の平均 37〜50）と走らせる。
+  // 再設計後は能力の弱点（スタミナ不足など）が終盤の失速として表れるため、弱点のない一様な馬は
+  // 同じ平均値の CPU 馬より相対的に強くなる。そこで最下位の水準を CPU 馬の平均よりやや下（42）に置いている
+  //（変更前は 45・55・65・75。再設計前の計算では 45 の勝率 12%、再設計後は 27%）
+  const stats = [42, 52, 62, 72].map((lvl) =>
     runTrials({ abilities: Object.fromEntries(ABILITY_KEYS.map((k) => [k, lvl])) as SimRunner["abilities"], aptitude: base, traits: [], tactics: { style: "stalker", pace: "normal", spurt: "normal" }, condition: 0, fatigue: 10, fitness: 85, experience: 4 }, p, 200, 1),
   );
   for (let i = 1; i < stats.length; i++) {
@@ -608,6 +612,81 @@ test("単騎逃げでは先頭争いがある場合よりペースが落ち着�
   assert.ok(["slow", "average", "high"].includes(sim.pace.label));
 });
 
+/* ---------------- 第3段階：スタミナ消費と仕掛け ---------------- */
+
+function compare(a: SimRunner, b: SimRunner, cond: { course: ReturnType<typeof makeCourse>; going: "good" | "soft" }, seeds = 50) {
+  const out = [a, b].map(() => ({ pos: 0, fade: 0, fadeAt: 0, lastSeg: 0, spurt: 0, reserveGoal: 0, pos800: 0, pos400: 0 }));
+  for (let s = 0; s < seeds; s++) {
+    [a, b].forEach((x, k) => {
+      const sim = simulateOwnerRace(starField({ ...x, id: "m" }, s), cond, 4000 + s);
+      const tel = sim.telemetry.m;
+      const o = out[k];
+      o.pos += sim.results.find((r) => r.id === "m")!.position;
+      if (tel.fadeRemain != null) {
+        o.fade++;
+        o.fadeAt += tel.fadeRemain;
+      }
+      o.lastSeg += tel.lastSegSpeed;
+      o.spurt += tel.spurtRemain ?? 0;
+      o.reserveGoal += tel.reserve![tel.reserve!.length - 1];
+      o.pos800 += tel.positions.find((p) => p.label === "残り800m")!.pos;
+      o.pos400 += tel.positions.find((p) => p.label === "残り400m")!.pos;
+    });
+  }
+  return out.map((o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round((v / seeds) * 100) / 100])));
+}
+
+test("同じ走力なら、スタミナの高い馬は持久戦で失速しにくい", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 3000), going: "soft" as const };
+  const apt = { ...runner("x", 1).aptitude, distanceMin: 2400, distanceMax: 3200 };
+  const mk = (stamina: number) => runner("m", 1, 62, { aptitude: apt, tactics: { style: "stalker", pace: "aggressive", spurt: "normal" }, abilities: { ...runner("x", 1, 62).abilities, stamina } });
+  const [hi, lo] = compare(mk(88), mk(40), cond);
+  // 失速が始まる地点がゴールに近い（=長く脚が持つ）
+  assert.ok(hi.fadeAt < lo.fadeAt - 100, JSON.stringify({ hi, lo }));
+  assert.ok(hi.lastSeg > lo.lastSeg, JSON.stringify({ hi, lo }));
+  assert.ok(hi.pos < lo.pos, JSON.stringify({ hi, lo }));
+});
+
+test("早仕掛けは進出を早めるが、消耗も増える", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 2000), going: "good" as const };
+  const mk = (spurt: "early" | "late") => runner("m", 1, 60, { tactics: { style: "closer", pace: "normal", spurt } });
+  const [early, late] = compare(mk("early"), mk("late"), cond);
+  assert.ok(early.spurt > late.spurt + 100, JSON.stringify({ early, late }));
+  assert.ok(early.pos400 < late.pos400, JSON.stringify({ early, late }));
+  assert.ok(early.reserveGoal < late.reserveGoal, JSON.stringify({ early, late }));
+  assert.ok(early.fadeAt > late.fadeAt, JSON.stringify({ early, late }));
+});
+
+test("根性は終盤の失速に抵抗する", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 2400), going: "soft" as const };
+  const mk = (fightingSpirit: number) =>
+    runner("m", 1, 60, { tactics: { style: "front", pace: "aggressive", spurt: "early" }, abilities: { ...runner("x", 1, 60).abilities, stamina: 45, fightingSpirit } });
+  const [hi, lo] = compare(mk(90), mk(25), cond);
+  assert.ok(hi.lastSeg > lo.lastSeg, JSON.stringify({ hi, lo }));
+  assert.ok(hi.pos <= lo.pos, JSON.stringify({ hi, lo }));
+});
+
+test("スタミナが切れても急に止まらず、徐々に速度が落ちて全馬ゴールする", () => {
+  const cond = { course: makeCourse("midorigaoka", "turf", 3000), going: "heavy" as const };
+  const weak = runner("w", 1, 45, { tactics: { style: "front", pace: "aggressive", spurt: "early" }, abilities: { ...runner("x", 1, 45).abilities, stamina: 15 } });
+  let faded = 0;
+  for (let s = 0; s < 10; s++) {
+    const sim = simulateOwnerRace(starField({ ...weak, id: "m" }, s), cond, 50 + s);
+    assert.equal(sim.results.length, 8);
+    for (const r of sim.results) assert.ok(r.timeMs < 300_000);
+    const tel = sim.telemetry.m;
+    if (tel.emptyRemain !== null) faded++;
+    // 速度の落ち方：記録の間隔ごとの減速が一定以内（急ブレーキがない）
+    const idx = sim.results.find((r) => r.id === "m")!.gate - 1;
+    const sp = sim.frames.slice(1).map((f, k) => (f[idx] - sim.frames[k][idx]) / sim.sampleDt);
+    const finishK = sim.frames.findIndex((f) => f[idx] >= 3000);
+    for (let k = 20; k < finishK - 1; k++) assert.ok(sp[k] - sp[k + 1] < 1.1 * sim.sampleDt + 0.25, `急な減速 ${sp[k].toFixed(2)}→${sp[k + 1].toFixed(2)}`);
+    // 失速が始まる地点は、エネルギーが尽きる地点より前
+    if (tel.emptyRemain !== null) assert.ok(tel.fadeRemain != null && tel.fadeRemain >= tel.emptyRemain);
+  }
+  assert.ok(faded >= 5, `スタミナ切れ ${faded}/10`);
+});
+
 test("出走すると賞金・戦績が保存され、調教師のレース評で推定が更新される", () => {
   let s = newOwnerGame("テスト", 8);
   s = chooseStarter(s, s.starterOffers![0].offerId, "t5", null);
@@ -671,6 +750,7 @@ test("レース計算の結果が基準値と完全に一致する（UI・3D の
   // ・2309594831 / 13033：v2.0 着手前（コミット a2b7516）
   // ・レース計算の再設計 第1段階（脚質と最高速度の分離・全馬同時更新）で更新
   // ・第2段階（ペース予測・先頭争い・単騎逃げ）で更新
-  assert.equal(_hash(acc), 1433428049);
-  assert.equal(acc.length, 12986);
+  // ・第3段階（徐々に落ちる失速・消耗要因・仕掛けの判断）で更新
+  assert.equal(_hash(acc), 889917125);
+  assert.equal(acc.length, 13003);
 });
