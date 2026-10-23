@@ -50,9 +50,9 @@ export function RecordsScreen({ route }: { route: RecordsRoute }) {
   return (
     <div className="screen">
       <div className="head-tabs">
-        <ScreenHead nav={nav} title="記録・分析" />
+        <ScreenHead nav={nav} title="記録" />
         <Tabs<RecordsTab>
-          label="記録・分析"
+          label="記録"
           value={sub}
           items={[
             ["races", "戦績"],

@@ -53,7 +53,7 @@ function HorseList({ selectedId }: { selectedId?: string }) {
   return (
     <div className="screen">
       <ScreenHead
-        title="所有馬"
+        title="愛馬"
         sub={`現役 ${vm.horses.length}頭${retired.length ? `／引退・売却 ${retired.length}頭` : ""}`}
         right={
           <button className="btn btn-ghost btn-small" onClick={() => nav.push({ tab: "shop" })}>

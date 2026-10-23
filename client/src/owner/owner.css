@@ -3078,3 +3078,13 @@ button.offer2 {
 .cls-proposal { color: #3b5b8a; border-style: dotted; }
 .obs-list { list-style: none; margin: 0.4rem 0 0.8rem; padding: 0; display: grid; gap: 0.45rem; }
 .obs-list li { line-height: 1.55; }
+
+/* タブ：狭い画面でも横スクロールの奥に隠さず、折り返して全部見せる */
+.tabs-row {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  row-gap: 0;
+}
+.tabs-row button {
+  min-height: 40px;
+}
